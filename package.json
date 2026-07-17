@@ -1,0 +1,15 @@
+{
+  "name": "flight-ticket-booking",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "both": "concurrently \"cd frontend && npm run dev\" \"cd flight-deal-agent-api && npm run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
+  }
+}
