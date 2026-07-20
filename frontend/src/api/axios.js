@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -36,8 +36,9 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Don't refresh on auth endpoints themselves
-    if (original.url?.includes("/auth/")) {
+    // Don't refresh on the auth endpoints themselves — but DO refresh /auth/me
+    const NO_REFRESH_PATHS = ["/auth/login", "/auth/register", "/auth/refresh", "/auth/logout"];
+    if (NO_REFRESH_PATHS.some((path) => original.url?.includes(path))) {
       return Promise.reject(error);
     }
 

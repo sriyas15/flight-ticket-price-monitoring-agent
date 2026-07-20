@@ -1,19 +1,15 @@
-import MockFlightProvider from "./mock.provider.js";
+import MockFlightProvider        from "./mock.provider.js";
+import TravelpayoutsProvider     from "./travelpayouts.provider.js";
 import env from "../../config/env.js";
 
 /**
- * Returns the configured flight data provider.
- * Swap env.FLIGHT_PROVIDER to "kiwi" or "duffel" when real providers
- * are integrated — no changes needed in MonitoringService.
+ * Returns the active flight data provider based on FLIGHT_PROVIDER env var.
+ * All providers implement the same interface (provider.interface.js).
  */
 const getFlightProvider = () => {
-  const name = env.FLIGHT_PROVIDER || "mock";
-
-  switch (name) {
-    case "mock":
-      return MockFlightProvider;
-    // case "kiwi":   return KiwiProvider;
-    // case "duffel": return DuffelProvider;
+  switch (env.FLIGHT_PROVIDER) {
+    case "travelpayouts": return TravelpayoutsProvider;
+    case "mock":          return MockFlightProvider;
     default:
       return MockFlightProvider;
   }
