@@ -3,7 +3,7 @@ import api from "../api/axios.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
 export const useUser = () => {
-  const { user, login } = useAuth();
+  const { user, logout } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
   const [success, setSuccess] = useState(null);
@@ -20,9 +20,7 @@ export const useUser = () => {
     } catch (err) {
       setError(err.response?.data?.message || "Failed to update profile.");
       throw err;
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, []);
 
   const connectTelegram = useCallback(async (telegramChatId) => {
@@ -30,14 +28,12 @@ export const useUser = () => {
     setLoading(true);
     try {
       const { data } = await api.patch("/users/me/telegram", { telegramChatId });
-      setSuccess("Telegram connected successfully.");
+      setSuccess("Telegram connected! Check your Telegram for a confirmation message.");
       return data.data.user;
     } catch (err) {
       setError(err.response?.data?.message || "Failed to connect Telegram.");
       throw err;
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, []);
 
   const disconnectTelegram = useCallback(async () => {
@@ -50,9 +46,7 @@ export const useUser = () => {
     } catch (err) {
       setError(err.response?.data?.message || "Failed to disconnect Telegram.");
       throw err;
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, []);
 
   const changePassword = useCallback(async (payload) => {
@@ -64,10 +58,23 @@ export const useUser = () => {
     } catch (err) {
       setError(err.response?.data?.message || "Failed to change password.");
       throw err;
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, []);
+
+  const deleteAccount = useCallback(async (password) => {
+    clearMessages();
+    setLoading(true);
+    try {
+      await api.delete("/users/me", { data: { password } });
+      // Wipe local session — auth context logout handles redirect
+      await logout();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to delete account.");
+      setLoading(false);
+      throw err;
+    }
+    // Don't setLoading(false) on success — page will unmount via logout redirect
+  }, [logout]);
 
   return {
     user,
@@ -79,5 +86,6 @@ export const useUser = () => {
     connectTelegram,
     disconnectTelegram,
     changePassword,
+    deleteAccount,
   };
 };
