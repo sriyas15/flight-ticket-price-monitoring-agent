@@ -2,7 +2,9 @@ import { useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useRoutes } from "../hooks/useRoutes.js";
 import { useAlerts } from "../hooks/useAlerts.js";
+import { usePriceHistory } from "../hooks/usePriceHistory.js";
 import RouteModal from "../components/routes/RouteModal.jsx";
+import PriceChart from "../components/routes/PriceChart.jsx";
 import {
   Spinner, StatusPill, PriceFlap, IconBtn,
   EmptyState, ErrorBanner,
@@ -12,13 +14,15 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const { routes, loading, error, createRoute, updateRoute, deleteRoute } = useRoutes();
   const { alerts, loading: alertsLoading } = useAlerts(10);
+  const priceHistory = usePriceHistory();
 
-  const [modalOpen, setModalOpen]   = useState(false);
-  const [editRoute, setEditRoute]   = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
+  const [modalOpen, setModalOpen]     = useState(false);
+  const [editRoute, setEditRoute]     = useState(null);
+  const [deletingId, setDeletingId]   = useState(null);
+  const [expandedId, setExpandedId]   = useState(null); // chart panel open
 
-  const openAdd  = () => { setEditRoute(null); setModalOpen(true); };
-  const openEdit = (route) => { setEditRoute(route); setModalOpen(true); };
+  const openAdd    = () => { setEditRoute(null); setModalOpen(true); };
+  const openEdit   = (route) => { setEditRoute(route); setModalOpen(true); };
   const closeModal = () => { setModalOpen(false); setEditRoute(null); };
 
   const handleSave = async (payload) => {
@@ -42,6 +46,18 @@ export default function DashboardPage() {
     setDeletingId(id);
     try { await deleteRoute(id); }
     finally { setDeletingId(null); }
+  };
+
+  const handleToggleChart = (routeId) => {
+    if (expandedId === routeId) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(routeId);
+    // Fetch only if we don't already have data
+    if (!priceHistory.getHistory(routeId).length) {
+      priceHistory.fetchHistory(routeId, 30);
+    }
   };
 
   const greeting = () => {
@@ -78,10 +94,10 @@ export default function DashboardPage() {
       <div className="rounded-xl overflow-hidden mb-6"
         style={{ background: "#FFFFFF", border: "1px solid #EAE6E0", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
 
-        {/* Header */}
+        {/* Table header */}
         <div className="grid px-5 py-3.5"
           style={{
-            gridTemplateColumns: "2fr 1fr 1fr 1fr 110px",
+            gridTemplateColumns: "2fr 1fr 1fr 1fr 130px",
             borderBottom: "1px solid #EAE6E0",
             fontFamily: "'Space Mono', monospace",
             fontSize: 10, letterSpacing: "0.14em",
@@ -112,14 +128,51 @@ export default function DashboardPage() {
           />
         ) : (
           routes.map((route) => (
-            <RouteRow
-              key={route._id}
-              route={route}
-              deleting={deletingId === route._id}
-              onEdit={() => openEdit(route)}
-              onPause={() => handlePause(route)}
-              onDelete={() => handleDelete(route._id)}
-            />
+            <div key={route._id}>
+              <RouteRow
+                route={route}
+                deleting={deletingId === route._id}
+                chartOpen={expandedId === route._id}
+                onEdit={() => openEdit(route)}
+                onPause={() => handlePause(route)}
+                onDelete={() => handleDelete(route._id)}
+                onToggleChart={() => handleToggleChart(route._id)}
+              />
+              {/* ── Inline chart panel ── */}
+              {expandedId === route._id && (
+                <div
+                  className="px-5 py-5"
+                  style={{ borderBottom: "1px solid #EAE6E0", background: "#FDFCFA" }}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <span style={{
+                      fontFamily: "'Space Mono', monospace",
+                      fontSize: 10, letterSpacing: "0.14em",
+                      textTransform: "uppercase", color: "#8FA3B1",
+                    }}>
+                      Price history · {route.origin} → {route.destination}
+                    </span>
+                    <button
+                      onClick={() => priceHistory.fetchHistory(route._id, 30)}
+                      className="text-xs flex items-center gap-1.5 px-2.5 py-1.5 rounded-md"
+                      style={{ background: "#F0EDE7", border: "none", color: "#5C7589", cursor: "pointer" }}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="23 4 23 10 17 10"/>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                      </svg>
+                      Refresh
+                    </button>
+                  </div>
+                  <PriceChart
+                    route={route}
+                    history={priceHistory.getHistory(route._id)}
+                    loading={priceHistory.isLoading(route._id)}
+                    error={priceHistory.getError(route._id)}
+                  />
+                </div>
+              )}
+            </div>
           ))
         )}
       </div>
@@ -158,31 +211,34 @@ export default function DashboardPage() {
 }
 
 // ── Route row ─────────────────────────────────────────────────────────────
-function RouteRow({ route, onEdit, onPause, onDelete, deleting }) {
+function RouteRow({ route, onEdit, onPause, onDelete, onToggleChart, deleting, chartOpen }) {
   const isPaused = route.status === "paused";
   const isDeal = route.baselinePrice &&
     route.baselinePrice > 0 &&
     route.lastPrice < route.baselinePrice * 0.8;
 
   const dateLabel = () => {
-    const from = route.departureDateFrom ? new Date(route.departureDateFrom).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "";
-    const to   = route.departureDateTo   ? ` – ${new Date(route.departureDateTo).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}` : "";
-    const pax  = `${route.passengers} pax`;
-    const cabin = route.cabinClass.replace("_", " ");
-    return `${from}${to} · ${route.tripType === "round_trip" ? "Round trip" : "One-way"} · ${cabin} · ${pax}`;
+    const from  = route.departureDateFrom
+      ? new Date(route.departureDateFrom).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })
+      : "";
+    const to    = route.departureDateTo
+      ? ` – ${new Date(route.departureDateTo).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}`
+      : "";
+    const cabin = route.cabinClass?.replace("_", " ") ?? "";
+    return `${from}${to} · ${route.tripType === "round_trip" ? "Round trip" : "One-way"} · ${cabin} · ${route.passengers} pax`;
   };
 
   return (
     <div
       className="grid items-center px-5 py-4 transition-colors"
       style={{
-        gridTemplateColumns: "2fr 1fr 1fr 1fr 110px",
-        borderBottom: "1px solid #EAE6E0",
+        gridTemplateColumns: "2fr 1fr 1fr 1fr 130px",
+        borderBottom: chartOpen ? "none" : "1px solid #EAE6E0",
         opacity: isPaused ? 0.6 : 1,
-        background: "transparent",
+        background: chartOpen ? "#FDFCFA" : "transparent",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "#FDFCFA")}
-      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+      onMouseEnter={(e) => { if (!chartOpen) e.currentTarget.style.background = "#FDFCFA"; }}
+      onMouseLeave={(e) => { if (!chartOpen) e.currentTarget.style.background = "transparent"; }}
     >
       {/* Route */}
       <div className="flex flex-col gap-0.5">
@@ -214,18 +270,34 @@ function RouteRow({ route, onEdit, onPause, onDelete, deleting }) {
 
       {/* Actions */}
       <div className="flex items-center gap-1">
+        {/* Chart toggle */}
+        <IconBtn
+          title={chartOpen ? "Hide chart" : "Show price history"}
+          onClick={onToggleChart}
+          style={chartOpen ? { background: "rgba(242,169,59,0.12)", color: "#B87C1A" } : {}}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg>
+        </IconBtn>
+
+        {/* Edit */}
         <IconBtn title="Edit" onClick={onEdit}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
             <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
           </svg>
         </IconBtn>
+
+        {/* Pause/Resume */}
         <IconBtn title={isPaused ? "Resume" : "Pause"} onClick={onPause}>
           {isPaused
             ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
           }
         </IconBtn>
+
+        {/* Delete */}
         <IconBtn title="Delete" onClick={onDelete}>
           {deleting
             ? <Spinner size={14} />
