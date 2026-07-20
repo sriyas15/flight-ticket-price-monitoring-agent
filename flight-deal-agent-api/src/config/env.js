@@ -40,6 +40,7 @@ const env = {
 
   // ── Flight Provider ───────────────────────────────
   FLIGHT_PROVIDER: process.env.FLIGHT_PROVIDER || "mock",
+  TRAVELPAYOUTS_TOKEN: process.env.TRAVELPAYOUTS_TOKEN || null,
 
   // ── Telegram ──────────────────────────────────────
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || null,

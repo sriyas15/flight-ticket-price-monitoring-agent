@@ -1,4 +1,4 @@
-import "./config/env.js";          // validate env vars first — fail fast
+import "./config/env.js";          
 import app from "./app.js";
 import connectDB from "./config/db.js";
 import { getRedisClient } from "./config/redis.js";
@@ -6,12 +6,11 @@ import logger from "./config/logger.js";
 import env from "./config/env.js";
 import { scheduleMonitorJob, startMonitorWorker } from "./jobs/monitor.job.js";
 import { scheduleCleanupJob, startCleanupWorker } from "./jobs/cleanup.job.js";
+import { startBotListener, stopBotListener } from "./providers/notification/telegram.bot.js";
 import dns from 'dns';
 dns.setServers(['8.8.8.8', '1.1.1.1']);
 
-// ── Workers and queues (closed on shutdown) ───────────────────────────────
 const workers = [];
-const queues  = [];
 
 const start = async () => {
   // 1. MongoDB
@@ -31,10 +30,14 @@ const start = async () => {
   await scheduleMonitorJob();
   await scheduleCleanupJob();
 
-  // 5. HTTP server
+  // 5. Telegram long-poll bot (FR-19: /mystatus, /pause, /help)
+  startBotListener();
+
+  // 6. HTTP server
   const server = app.listen(env.PORT, () => {
     logger.info(`Server running on port ${env.PORT} [${env.NODE_ENV}]`);
     logger.info(`Flight provider: ${env.FLIGHT_PROVIDER}`);
+    logger.info(`Telegram bot: ${env.TELEGRAM_BOT_TOKEN ? "active" : "disabled (no token)"}`);
   });
 
   // ── Graceful shutdown ────────────────────────────────────────────────────
@@ -44,12 +47,12 @@ const start = async () => {
     // Stop accepting new HTTP requests
     server.close();
 
+    // Stop Telegram polling first (avoids duplicate updates on restart)
+    await stopBotListener();
+
     // Drain BullMQ workers (let in-progress jobs finish)
     await Promise.all(workers.map((w) => w.close()));
     logger.info("Workers drained");
-
-    // Close queues
-    await Promise.all(queues.map((q) => q.close()));
 
     // Close Redis
     await redis.quit();
