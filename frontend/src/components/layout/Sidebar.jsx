@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
+import ProfilePanel from "./ProfilePanel.jsx";
 
 const NAV = [
   {
@@ -36,6 +38,7 @@ const NAV = [
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -47,104 +50,115 @@ export default function Sidebar() {
     : "?";
 
   return (
-    <aside
-      className="flex flex-col h-screen sticky top-0"
-      style={{
-        width: 220,
-        minWidth: 220,
-        background: "#FFFFFF",
-        borderRight: "1px solid #EAE6E0",
-        fontFamily: "'Work Sans', sans-serif",
-      }}
-    >
-      {/* ── Brand ── */}
-      <div className="px-5 py-6 flex items-center gap-2.5">
-        <span
-          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-          style={{ background: "#4FAE84", boxShadow: "0 0 0 3px rgba(79,174,132,0.2)" }}
-        />
-        <span
-          style={{
+    <>
+      <aside
+        className="flex flex-col h-screen sticky top-0 z-30"
+        style={{
+          width: 220,
+          minWidth: 220,
+          background: "#FFFFFF",
+          borderRight: "1px solid #EAE6E0",
+          fontFamily: "'Work Sans', sans-serif",
+        }}
+      >
+        {/* ── Brand ── */}
+        <div className="px-5 py-6 flex items-center gap-2.5">
+          <span
+            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+            style={{ background: "#4FAE84", boxShadow: "0 0 0 3px rgba(79,174,132,0.2)" }}
+          />
+          <span style={{
             fontFamily: "'Space Mono', monospace",
-            fontSize: 11,
-            letterSpacing: "0.16em",
-            textTransform: "uppercase",
-            color: "#8FA3B1",
-          }}
-        >
-          Fare Watch
-        </span>
-      </div>
-
-      <div className="mx-4 mb-4" style={{ height: 1, background: "#EAE6E0" }} />
-
-      {/* ── Nav links ── */}
-      <nav className="flex flex-col gap-1 px-3 flex-1">
-        {NAV.map(({ to, label, icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
-            style={({ isActive }) => ({
-              background: isActive ? "rgba(242,169,59,0.10)" : "transparent",
-              color: isActive ? "#B87C1A" : "#5C7589",
-              textDecoration: "none",
-            })}
-          >
-            {({ isActive }) => (
-              <>
-                <span style={{ color: isActive ? "#F2A93B" : "#8FA3B1" }}>{icon}</span>
-                {label}
-              </>
-            )}
-          </NavLink>
-        ))}
-      </nav>
-
-      {/* ── User + Logout ── */}
-      <div className="px-4 py-5 flex flex-col gap-3">
-        <div className="flex items-center gap-3">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
-            style={{
-              background: "#F2A93B",
-              color: "#23150A",
-              fontFamily: "'Space Mono', monospace",
-            }}
-          >
-            {initials}
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm font-semibold truncate" style={{ color: "#0E1F33" }}>
-              {user?.firstName} {user?.lastName}
-            </span>
-            <span className="text-xs truncate" style={{ color: "#8FA3B1" }}>
-              {user?.email}
-            </span>
-          </div>
+            fontSize: 11, letterSpacing: "0.16em",
+            textTransform: "uppercase", color: "#8FA3B1",
+          }}>
+            Fare Watch
+          </span>
         </div>
 
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium w-full transition-colors"
-          style={{ background: "transparent", border: "none", color: "#8FA3B1", cursor: "pointer" }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "#FFF0F0";
-            e.currentTarget.style.color = "#C04030";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent";
-            e.currentTarget.style.color = "#8FA3B1";
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-            <path d="M16 17l5-5-5-5" />
-            <path d="M21 12H9" />
-          </svg>
-          Log out
-        </button>
-      </div>
-    </aside>
+        <div className="mx-4 mb-4" style={{ height: 1, background: "#EAE6E0" }} />
+
+        {/* ── Nav links ── */}
+        <nav className="flex flex-col gap-1 px-3 flex-1">
+          {NAV.map(({ to, label, icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
+              style={({ isActive }) => ({
+                background: isActive ? "rgba(242,169,59,0.10)" : "transparent",
+                color: isActive ? "#B87C1A" : "#5C7589",
+                textDecoration: "none",
+              })}
+            >
+              {({ isActive }) => (
+                <>
+                  <span style={{ color: isActive ? "#F2A93B" : "#8FA3B1" }}>{icon}</span>
+                  {label}
+                </>
+              )}
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* ── User card + Logout ── */}
+        <div className="px-4 py-5 flex flex-col gap-2" style={{ borderTop: "1px solid #EAE6E0" }}>
+          {/* Clickable profile row */}
+          <button
+            onClick={() => setProfileOpen(true)}
+            className="flex items-center gap-3 w-full px-2 py-2 rounded-lg transition-colors text-left"
+            style={{ background: "transparent", border: "none", cursor: "pointer" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#F7F5F1")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            title="View profile"
+          >
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
+              style={{ background: "#F2A93B", color: "#23150A", fontFamily: "'Space Mono', monospace" }}
+            >
+              {initials}
+            </div>
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-sm font-semibold truncate" style={{ color: "#0E1F33" }}>
+                {user?.firstName} {user?.lastName}
+              </span>
+              <span className="text-xs truncate" style={{ color: "#8FA3B1" }}>
+                {user?.email}
+              </span>
+            </div>
+            {/* Telegram indicator dot */}
+            <span
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              title={user?.telegramChatId ? "Telegram connected" : "Telegram not connected"}
+              style={{ background: user?.telegramChatId ? "#4FAE84" : "#E5E0D8" }}
+            />
+          </button>
+
+          {/* Logout */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium w-full transition-colors"
+            style={{ background: "transparent", border: "none", color: "#8FA3B1", cursor: "pointer" }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#FFF0F0";
+              e.currentTarget.style.color = "#C04030";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = "#8FA3B1";
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+              <path d="M16 17l5-5-5-5" /><path d="M21 12H9" />
+            </svg>
+            Log out
+          </button>
+        </div>
+      </aside>
+
+      {/* Profile slide-over */}
+      <ProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
+    </>
   );
 }
