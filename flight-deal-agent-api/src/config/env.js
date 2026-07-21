@@ -29,7 +29,8 @@ const env = {
 
   CLIENT_URL: process.env.CLIENT_URL || "http://localhost:5173",
 
-  RATE_LIMIT_WINDOW_MS: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
+  RATE_LIMIT_WINDOW_MS:
+    parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
   RATE_LIMIT_MAX: parseInt(process.env.RATE_LIMIT_MAX, 10) || 100,
   AUTH_RATE_LIMIT_MAX: parseInt(process.env.AUTH_RATE_LIMIT_MAX, 10) || 10,
 
@@ -38,9 +39,16 @@ const env = {
   REDIS_PORT: parseInt(process.env.REDIS_PORT, 10) || 6379,
   REDIS_PASSWORD: process.env.REDIS_PASSWORD || null,
 
+  // ── Google OAuth ─────────────────────────────────────
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || null,
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || null,
+  GOOGLE_CALLBACK_URL:
+    process.env.GOOGLE_CALLBACK_URL ||
+    "http://localhost:4000/api/auth/google/callback",
+
   // ── Flight Provider ───────────────────────────────
   FLIGHT_PROVIDER: process.env.FLIGHT_PROVIDER || "mock",
-  TRAVELPAYOUTS_TOKEN: process.env.TRAVELPAYOUTS_TOKEN || null,
+  TRAVELPAYOUTS_API_TOKEN: process.env.TRAVELPAYOUTS_API_TOKEN || null,
 
   // ── Telegram ──────────────────────────────────────
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || null,

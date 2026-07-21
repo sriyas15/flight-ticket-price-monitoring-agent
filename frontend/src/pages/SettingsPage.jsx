@@ -31,7 +31,23 @@ export default function SettingsPage() {
       <div className="flex flex-col gap-5">
         <ProfileSection   user={user} onSave={async (p) => { clearMessages(); await updateProfile(p); }} />
         <TelegramSection  user={user} onConnect={async (id) => { clearMessages(); await connectTelegram(id); }} onDisconnect={async () => { clearMessages(); await disconnectTelegram(); }} />
-        <PasswordSection  onSave={async (p) => { clearMessages(); await changePassword(p); }} />
+        {/* Password section only shown for local (email/password) accounts */}
+        {user?.authProvider !== "google" && (
+          <PasswordSection onSave={async (p) => { clearMessages(); await changePassword(p); }} />
+        )}
+        {user?.authProvider === "google" && (
+          <SectionCard eyebrow="03 — Security" title="Password" sub="Your account uses Google Sign-In — no password is required.">
+            <div className="flex items-center gap-3 rounded-lg px-4 py-3"
+              style={{ background: "rgba(234,67,53,0.04)", border: "1px solid rgba(234,67,53,0.12)" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24">
+                <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.24 1.4-1.7 4.1-5.5 4.1-3.3 0-6-2.7-6-6.2s2.7-6.2 6-6.2c1.9 0 3.1.8 3.9 1.5l2.7-2.6C16.9 3.1 14.7 2.1 12 2.1 6.9 2.1 2.7 6.3 2.7 12s4.2 9.9 9.3 9.9c5.4 0 9-3.8 9-9.1 0-.6-.1-1.1-.1-1.6H12z"/>
+              </svg>
+              <span className="text-sm" style={{ color: "#5C7589" }}>
+                Signed in with Google. Manage your password via your Google account.
+              </span>
+            </div>
+          </SectionCard>
+        )}
         <DangerSection    user={user} onDelete={deleteAccount} onError={(msg) => { clearMessages(); }} />
       </div>
     </div>

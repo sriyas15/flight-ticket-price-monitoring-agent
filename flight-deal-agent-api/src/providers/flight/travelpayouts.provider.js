@@ -6,10 +6,10 @@ const BASE_URL = "https://api.travelpayouts.com/v1/prices";
 
 // Cabin class → trip_class integer (Travelpayouts uses 0/1/2)
 const CABIN_MAP = {
-  economy:         0,
+  economy: 0,
   premium_economy: 0, // no premium_economy in TP — treat as economy
-  business:        1,
-  first:           2,
+  business: 1,
+  first: 2,
 };
 
 // Build a booking search link (affiliate deep link)
@@ -46,24 +46,26 @@ const TravelpayoutsProvider = {
       currency = "INR",
     } = params;
 
-    if (!env.TRAVELPAYOUTS_TOKEN) {
-      throw new Error("TRAVELPAYOUTS_TOKEN is not set in environment");
+    if (!env.TRAVELPAYOUTS_API_TOKEN) {
+      throw new Error("TRAVELPAYOUTS_API_TOKEN is not set in environment");
     }
 
     // Calendar endpoint needs yyyy-mm (month granularity)
     const departMonth = _toYYYYMM(departureDateFrom);
     if (!departMonth) {
-      logger.warn(`[Travelpayouts] Invalid departureDateFrom: ${departureDateFrom}`);
+      logger.warn(
+        `[Travelpayouts] Invalid departureDateFrom: ${departureDateFrom}`,
+      );
       return null;
     }
 
     const query = {
       origin,
       destination,
-      depart_date:   departMonth,
+      depart_date: departMonth,
       calendar_type: "departure_date",
-      currency:      currency.toUpperCase(),
-      token:         env.TRAVELPAYOUTS_TOKEN,
+      currency: currency.toUpperCase(),
+      token: env.TRAVELPAYOUTS_API_TOKEN,
     };
 
     // Add return month for round trips
@@ -71,20 +73,24 @@ const TravelpayoutsProvider = {
       query.return_date = _toYYYYMM(returnDateFrom);
     }
 
-    logger.debug(`[Travelpayouts] Fetching ${origin}→${destination} for ${departMonth}`);
+    logger.debug(
+      `[Travelpayouts] Fetching ${origin}→${destination} for ${departMonth}`,
+    );
 
     try {
       const { data: body } = await axios.get(`${BASE_URL}/calendar`, {
         params: query,
         headers: {
-          "x-access-token": env.TRAVELPAYOUTS_TOKEN,
+          "x-access-token": env.TRAVELPAYOUTS_API_TOKEN,
           "Accept-Encoding": "gzip, deflate",
         },
         timeout: 10_000,
       });
 
       if (!body.success || !body.data || !Object.keys(body.data).length) {
-        logger.debug(`[Travelpayouts] No data returned for ${origin}→${destination} ${departMonth}`);
+        logger.debug(
+          `[Travelpayouts] No data returned for ${origin}→${destination} ${departMonth}`,
+        );
         return null;
       }
 
@@ -94,23 +100,30 @@ const TravelpayoutsProvider = {
 
       // Reject stale prices (expired_at in the past)
       if (best.expires_at && new Date(best.expires_at) < new Date()) {
-        logger.debug(`[Travelpayouts] Price expired for ${origin}→${destination}`);
+        logger.debug(
+          `[Travelpayouts] Price expired for ${origin}→${destination}`,
+        );
         return null;
       }
 
       return {
-        price:         best.price,
-        currency:      currency.toUpperCase(),
+        price: best.price,
+        currency: currency.toUpperCase(),
         origin,
         destination,
         departureDate: best.departure_at?.slice(0, 10) ?? departureDateFrom,
-        returnDate:    best.return_at?.slice(0, 10) ?? null,
-        airline:       best.airline ?? null,
-        transfers:     best.transfers ?? null,
-        provider:      "travelpayouts",
-        bookingLink:   bookingLink(origin, destination, best.departure_at?.slice(0, 10), currency),
-        fetchedAt:     new Date(),
-        expiresAt:     best.expires_at ? new Date(best.expires_at) : null,
+        returnDate: best.return_at?.slice(0, 10) ?? null,
+        airline: best.airline ?? null,
+        transfers: best.transfers ?? null,
+        provider: "travelpayouts",
+        bookingLink: bookingLink(
+          origin,
+          destination,
+          best.departure_at?.slice(0, 10),
+          currency,
+        ),
+        fetchedAt: new Date(),
+        expiresAt: best.expires_at ? new Date(best.expires_at) : null,
       };
     } catch (err) {
       if (err.response?.status === 429) {

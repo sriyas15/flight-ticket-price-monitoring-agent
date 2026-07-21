@@ -167,6 +167,27 @@ const AuthService = {
     return { message: "Password reset successfully. Please log in with your new password." };
   },
 
+  // ── GOOGLE OAUTH ──────────────────────────────────────────────────────────
+
+  /**
+   * Called after Passport verifies the Google profile.
+   * User is already found-or-created by the strategy.
+   * Just issues tokens and stores the refresh token hash.
+   */
+  googleAuth: async (user) => {
+    if (!user.isActive) {
+      throw ApiError.forbidden("Your account has been deactivated. Contact support.");
+    }
+
+    const tokens = generateTokenPair(user);
+    const rtHash = _hashToken(tokens.refreshToken);
+    await AuthRepository.setRefreshToken(user._id, rtHash);
+
+    logger.info(`Google OAuth login: ${user.email} [${user._id}]`);
+
+    return { user: user.toPublicProfile(), ...tokens };
+  },
+
   // ── GET ME ────────────────────────────────────────────────────────────────
 
   getMe: async (userId) => {

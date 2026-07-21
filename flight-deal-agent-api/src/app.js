@@ -4,6 +4,8 @@ import helmet from "helmet";
 import cookieParser from "cookie-parser";
 
 import env from "./config/env.js";
+import passport from "passport";
+import { configurePassport } from "./config/passport.js";
 import { requestIdMiddleware } from "./middleware/requestId.middleware.js";
 import { globalRateLimiter } from "./middleware/rateLimit.middleware.js";
 import { errorMiddleware } from "./middleware/error.middleware.js";
@@ -28,6 +30,10 @@ app.use(
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// ── Passport (OAuth) — no sessions needed ────────────────────────────────
+configurePassport();
+app.use(passport.initialize());
 
 // ── Request tracing ───────────────────────────────────────────────────────
 app.use(requestIdMiddleware);

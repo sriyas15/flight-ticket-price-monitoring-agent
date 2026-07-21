@@ -327,8 +327,14 @@ function Divider() {
 }
 
 function GoogleBtn() {
+  const handleGoogleAuth = () => {
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+    window.location.href = `${apiUrl}/auth/google`;
+  };
+
   return (
     <button
+      onClick={handleGoogleAuth}
       className="w-full flex items-center justify-center gap-2.5 rounded-lg py-3 text-sm font-semibold transition-all"
       style={{ background: "#FFFFFF", border: "1.5px solid #E5E0D8", color: "#0E1F33", cursor: "pointer", fontFamily: "'Work Sans', sans-serif" }}
       onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(14,31,51,0.3)")}

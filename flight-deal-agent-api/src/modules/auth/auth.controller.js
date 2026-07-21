@@ -1,5 +1,43 @@
 import AuthService from "./auth.service.js";
+import env from "../../config/env.js";
 import { sendSuccess } from "../../utils/response.js";
+
+// ── Google OAuth controllers ─────────────────────────────────────────────
+
+/**
+ * GET /api/auth/google
+ * Initiates Google OAuth — passport redirects to Google consent screen.
+ * Handled entirely by passport middleware in auth.routes.js.
+ */
+export const googleAuth = (_req, _res) => {};  // passport handles this
+
+/**
+ * GET /api/auth/google/callback
+ * Called by Google after user consents. Passport has already verified
+ * the profile and attached it to req.user by this point.
+ */
+export const googleCallback = async (req, res, next) => {
+  try {
+    const result = await AuthService.googleAuth(req.user);
+
+    // Set httpOnly refresh token cookie
+    setRefreshCookie(res, result.refreshToken);
+
+    // Redirect to frontend callback page with accessToken in query param.
+    // The frontend reads it, stores it, then redirects to /dashboard.
+    // We use a short-lived token in the URL — frontend must consume it immediately.
+    const redirectUrl = new URL(`${env.CLIENT_URL}/auth/callback`);
+    redirectUrl.searchParams.set("token", result.accessToken);
+    redirectUrl.searchParams.set("provider", "google");
+
+    return res.redirect(redirectUrl.toString());
+  } catch (err) {
+    // Redirect to login with error message instead of crashing
+    const redirectUrl = new URL(`${env.CLIENT_URL}/login`);
+    redirectUrl.searchParams.set("error", err.message || "Google sign-in failed");
+    return res.redirect(redirectUrl.toString());
+  }
+};
 
 // ── Cookie helpers ────────────────────────────────────────────────────────
 

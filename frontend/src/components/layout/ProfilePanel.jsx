@@ -66,8 +66,21 @@ export default function ProfilePanel({ open, onClose }) {
               {`${user?.firstName?.[0] ?? ""}${user?.lastName?.[0] ?? ""}`.toUpperCase()}
             </div>
             <div>
-              <div className="font-semibold text-sm" style={{ color: "#0E1F33" }}>
-                {user?.firstName} {user?.lastName}
+              <div className="flex items-center gap-2">
+                <div className="font-semibold text-sm" style={{ color: "#0E1F33" }}>
+                  {user?.firstName} {user?.lastName}
+                </div>
+                {user?.authProvider === "google" && (
+                  <span
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium"
+                    style={{ background: "rgba(234,67,53,0.08)", color: "#EA4335", fontSize: 10 }}
+                  >
+                    <svg width="9" height="9" viewBox="0 0 24 24">
+                      <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.24 1.4-1.7 4.1-5.5 4.1-3.3 0-6-2.7-6-6.2s2.7-6.2 6-6.2c1.9 0 3.1.8 3.9 1.5l2.7-2.6C16.9 3.1 14.7 2.1 12 2.1 6.9 2.1 2.7 6.3 2.7 12s4.2 9.9 9.3 9.9c5.4 0 9-3.8 9-9.1 0-.6-.1-1.1-.1-1.6H12z"/>
+                    </svg>
+                    Google
+                  </span>
+                )}
               </div>
               <div className="text-xs" style={{ color: "#8FA3B1" }}>{user?.email}</div>
               <div className="text-xs mt-0.5" style={{ color: user?.telegramChatId ? "#2D8A63" : "#8FA3B1" }}>

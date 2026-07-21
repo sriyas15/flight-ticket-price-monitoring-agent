@@ -6,7 +6,8 @@ import DashboardLayout from "./components/layout/DashboardLayout.jsx";
 import ProtectedRoute  from "./components/layout/ProtectedRoute.jsx";
 
 // Pages
-import AuthPage       from "./components/auth/AuthPage.jsx";
+import AuthPage           from "./components/auth/AuthPage.jsx";
+import AuthCallbackPage   from "./pages/AuthCallbackPage.jsx";
 import DashboardPage  from "./pages/DashboardPage.jsx";
 import AlertsPage     from "./pages/AlertsPage.jsx";
 import SettingsPage   from "./pages/SettingsPage.jsx";
@@ -19,7 +20,8 @@ export default function App() {
 
           {/* ── Public routes ── */}
           <Route path="/login"  element={<AuthPage />} />
-          <Route path="/register" element={<AuthPage />} />
+          <Route path="/register"      element={<AuthPage />} />
+          <Route path="/auth/callback"  element={<AuthCallbackPage />} />
 
           {/* ── Protected routes (require auth) ── */}
           <Route element={<ProtectedRoute />}>
