@@ -6,6 +6,7 @@ import {
   refresh,
   logout,
   forgotPassword,
+  verifyOtp,
   resetPassword,
   getMe,
   googleCallback,
@@ -14,6 +15,7 @@ import {
   registerValidation,
   loginValidation,
   forgotPasswordValidation,
+  verifyOtpValidation,
   resetPasswordValidation,
 } from "./auth.validation.js";
 import { validate } from "../../middleware/validate.middleware.js";
@@ -30,7 +32,8 @@ router.post("/register",        authRateLimiter, registerValidation,       valid
 router.post("/login",           authRateLimiter, loginValidation,          validate, login);
 router.post("/refresh",         authRateLimiter,                                     refresh);
 router.post("/forgot-password", authRateLimiter, forgotPasswordValidation, validate, forgotPassword);
-router.post("/reset-password",  authRateLimiter, resetPasswordValidation,  validate, resetPassword);
+router.post("/verify-otp",      authRateLimiter, verifyOtpValidation,       validate, verifyOtp);
+router.post("/reset-password",  authRateLimiter, resetPasswordValidation,   validate, resetPassword);
 router.post("/logout",          authMiddleware,                                       logout);
 router.get("/me",               authMiddleware,                                       getMe);
 

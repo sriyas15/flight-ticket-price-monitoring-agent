@@ -1,38 +1,22 @@
-/**
- * Auth repository delegates to UserRepository.
- * Keeping it as a separate layer means auth logic never reaches
- * into the users module's internals directly — and we can add
- * auth-specific models (e.g. token blocklist) here later.
- */
 import UserRepository from "../users/user.repository.js";
 
 const AuthRepository = {
-  findByEmail: (email) =>
-    UserRepository.findByEmail(email, true), // always fetch password for auth
+  findByEmail:               (email) => UserRepository.findByEmail(email, true),
+  findById:                  (id)    => UserRepository.findById(id),
+  findByIdWithRefreshToken:  (id)    => UserRepository.findByIdWithRefreshToken(id),
+  createUser:                (data)  => UserRepository.create(data),
+  existsByEmail:             (email) => UserRepository.existsByEmail(email),
+  setRefreshToken:           (id, hash) => UserRepository.setRefreshToken(id, hash),
 
-  findById: (id) =>
-    UserRepository.findById(id),
+  // ── OTP ──────────────────────────────────────────────────────────────────
+  setOtp:               (id, hash, expires) => UserRepository.setOtp(id, hash, expires),
+  findByIdWithOtp:      (id)               => UserRepository.findByIdWithOtp(id),
+  clearOtp:             (id)               => UserRepository.clearOtp(id),
 
-  findByIdWithRefreshToken: (id) =>
-    UserRepository.findByIdWithRefreshToken(id),
-
-  createUser: (data) =>
-    UserRepository.create(data),
-
-  existsByEmail: (email) =>
-    UserRepository.existsByEmail(email),
-
-  setRefreshToken: (id, hash) =>
-    UserRepository.setRefreshToken(id, hash),
-
-  setPasswordResetToken: (id, token, expires) =>
-    UserRepository.setPasswordResetToken(id, token, expires),
-
-  findByResetToken: (token) =>
-    UserRepository.findByResetToken(token),
-
-  clearPasswordReset: (id, newPasswordHash) =>
-    UserRepository.clearPasswordReset(id, newPasswordHash),
+  // ── Password reset ────────────────────────────────────────────────────────
+  setPasswordResetToken: (id, token, expires) => UserRepository.setPasswordResetToken(id, token, expires),
+  findByResetToken:      (token)              => UserRepository.findByResetToken(token),
+  clearPasswordReset:    (id, hash)           => UserRepository.clearPasswordReset(id, hash),
 };
 
 export default AuthRepository;

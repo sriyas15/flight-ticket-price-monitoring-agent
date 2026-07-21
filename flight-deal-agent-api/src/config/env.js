@@ -39,6 +39,10 @@ const env = {
   REDIS_PORT: parseInt(process.env.REDIS_PORT, 10) || 6379,
   REDIS_PASSWORD: process.env.REDIS_PASSWORD || null,
 
+  // ── Gmail SMTP ───────────────────────────────────────
+  GMAIL_USER: process.env.GMAIL_USER || null,
+  GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD || null,
+
   // ── Google OAuth ─────────────────────────────────────
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || null,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || null,

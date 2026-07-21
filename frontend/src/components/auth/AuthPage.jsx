@@ -55,8 +55,8 @@ function BoardingPassCard({ view, setView }) {
 // ── Login form ────────────────────────────────────────────────────────────
 function LoginForm({ setView }) {
   const { login } = useAuth();
-  const navigate = useNavigate();
-  const [form, setForm] = useState({ email: "", password: "" });
+  const navigate  = useNavigate();
+  const [form, setForm]   = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -93,11 +93,10 @@ function LoginForm({ setView }) {
           <Input id="email" type="email" placeholder="you@example.com"
             value={form.email} onChange={set("email")} required />
         </Field>
-        
         <Field label="Password" id="password">
           <div className="relative">
             <Input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••••"
-              value={form.password} onChange={set("password")} required />
+          	  value={form.password} onChange={set("password")} required />
             <PasswordToggle show={showPassword} toggle={() => setShowPassword(!showPassword)} />
           </div>
         </Field>
@@ -122,8 +121,8 @@ function LoginForm({ setView }) {
 // ── Register form ─────────────────────────────────────────────────────────
 function RegisterForm({ setView }) {
   const { register } = useAuth();
-  const navigate = useNavigate();
-  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "" });
+  const navigate     = useNavigate();
+  const [form, setForm]   = useState({ firstName: "", lastName: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -171,11 +170,10 @@ function RegisterForm({ setView }) {
           <Input id="remail" type="email" placeholder="you@example.com"
             value={form.email} onChange={set("email")} required />
         </Field>
-        
         <Field label="Password" id="rpw">
           <div className="relative">
-            <Input id="rpw" type={showPassword ? "text" : "password"} placeholder="Min. 8 chars"
-              value={form.password} onChange={set("password")} required />
+            <Input id="rpw" type={showPassword ? "text" : "password"} placeholder="Min. 8 chars, 1 uppercase, 1 number"
+          	  value={form.password} onChange={set("password")} required />
             <PasswordToggle show={showPassword} toggle={() => setShowPassword(!showPassword)} />
           </div>
         </Field>
@@ -208,23 +206,95 @@ function PasswordToggle({ show, toggle }) {
   );
 }
 
-// ── Forgot password card ──────────────────────────────────────────────────
+// ── Forgot password card — 3 steps ──────────────────────────────────────
+// step: "email" | "otp" | "reset" | "done"
 function ForgotCard({ view, setView }) {
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [step, setStep]         = useState("email");
+  const [email, setEmail]       = useState("");
+  const [otp, setOtp]           = useState(["", "", "", "", "", ""]);
+  const [resetToken, setResetToken] = useState("");
+  const [passwords, setPasswords]   = useState({ newPassword: "", confirmPassword: "" });
+  const [error, setError]       = useState("");
+  const [loading, setLoading]   = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const clearError = () => setError("");
+
+  // ── Step 1: send OTP ─────────────────────────────────────────
+  const handleSendOtp = async (e) => {
     e.preventDefault();
-    setError("");
+    clearError();
     setLoading(true);
     try {
       await authApi.forgotPassword(email);
-      setView("forgot-sent");
+      setStep("otp");
     } catch (err) {
-      setError(err.response?.data?.message || "Something went wrong. Please try again.");
+      setError(err.response?.data?.message || "Failed to send OTP.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ── Step 2: verify OTP ────────────────────────────────────────
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    clearError();
+    const otpString = otp.join("");
+    if (otpString.length !== 6) { setError("Please enter all 6 digits."); return; }
+    setLoading(true);
+    try {
+      const { data } = await authApi.verifyOtp(email, otpString);
+      setResetToken(data.data.resetToken);
+      setStep("reset");
+    } catch (err) {
+      setError(err.response?.data?.message || "Invalid or expired OTP.");
+      setOtp(["", "", "", "", "", ""]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Step 3: set new password ──────────────────────────────────
+  const handleReset = async (e) => {
+    e.preventDefault();
+    clearError();
+    if (passwords.newPassword.length < 8) { setError("Password must be at least 8 characters."); return; }
+    if (passwords.newPassword !== passwords.confirmPassword) { setError("Passwords do not match."); return; }
+    setLoading(true);
+    try {
+      await authApi.resetPassword(resetToken, passwords.newPassword);
+      setStep("done");
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to reset password. Please start again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── OTP input box handler ─────────────────────────────────────
+  const handleOtpChange = (index, value) => {
+    if (!/^[0-9]?$/.test(value)) return;
+    const next = [...otp];
+    next[index] = value;
+    setOtp(next);
+    // Auto-advance to next box
+    if (value && index < 5) {
+      document.getElementById(`otp-${index + 1}`)?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      document.getElementById(`otp-${index - 1}`)?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (pasted.length === 6) {
+      setOtp(pasted.split(""));
     }
   };
 
@@ -239,7 +309,124 @@ function ForgotCard({ view, setView }) {
     >
       <BrandMark />
 
-      {view === "forgot-sent" ? (
+      {/* ── Step 1: Enter email ── */}
+      {step === "email" && (
+        <>
+          <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Space Mono', monospace", color: "#0E1F33" }}>
+            Reset password.
+          </h1>
+          <p className="text-sm mb-7" style={{ color: "#8FA3B1" }}>
+            Enter your email and we'll send a 6-digit OTP.
+          </p>
+          <form onSubmit={handleSendOtp} className="flex flex-col gap-4">
+            <Field label="Email" id="femail">
+              <Input id="femail" type="email" placeholder="you@example.com"
+                value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </Field>
+            <ErrorBanner message={error} />
+            <PrimaryBtn type="submit" loading={loading}>Send OTP</PrimaryBtn>
+          </form>
+          <button onClick={() => setView("login")} className="mt-5 text-sm font-semibold flex items-center gap-1"
+            style={{ color: "#8FA3B1", background: "none", border: "none", cursor: "pointer" }}>
+            ← Back to sign in
+          </button>
+        </>
+      )}
+
+      {/* ── Step 2: Enter OTP ── */}
+      {step === "otp" && (
+        <>
+          <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Space Mono', monospace", color: "#0E1F33" }}>
+            Check your email.
+          </h1>
+          <p className="text-sm mb-7" style={{ color: "#8FA3B1" }}>
+            We sent a 6-digit code to <strong style={{ color: "#0E1F33" }}>{email}</strong>.
+            Enter it below — it expires in 10 minutes.
+          </p>
+
+          <form onSubmit={handleVerifyOtp} className="flex flex-col gap-5">
+            {/* OTP boxes */}
+            <div className="flex gap-2.5 justify-center" onPaste={handleOtpPaste}>
+              {otp.map((digit, i) => (
+                <input
+                  key={i}
+                  id={`otp-${i}`}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleOtpChange(i, e.target.value)}
+                  onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                  className="text-center rounded-xl text-xl font-bold transition-all outline-none"
+                  style={{
+                    width: 48, height: 56,
+                    fontFamily: "'Space Mono', monospace",
+                    background: digit ? "#FFFFFF" : "#F7F5F1",
+                    border: `2px solid ${digit ? "#F2A93B" : "#E5E0D8"}`,
+                    color: "#0E1F33",
+                  }}
+                  onFocus={(e) => (e.target.style.borderColor = "#F2A93B")}
+                  onBlur={(e) => (e.target.style.borderColor = digit ? "#F2A93B" : "#E5E0D8")}
+                />
+              ))}
+            </div>
+
+            <ErrorBanner message={error} />
+            <PrimaryBtn type="submit" loading={loading}>Verify OTP</PrimaryBtn>
+          </form>
+
+          <div className="flex items-center justify-between mt-5">
+            <button onClick={() => setView("login")}
+              className="text-sm font-semibold"
+              style={{ color: "#8FA3B1", background: "none", border: "none", cursor: "pointer" }}>
+              ← Back to sign in
+            </button>
+            <button
+              onClick={() => { setOtp(["","","","","",""]); clearError(); handleSendOtp({ preventDefault: () => {} }); }}
+              className="text-sm font-semibold"
+              style={{ color: "#F2A93B", background: "none", border: "none", cursor: "pointer" }}>
+              Resend OTP
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* ── Step 3: New password ── */}
+      {step === "reset" && (
+        <>
+          <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Space Mono', monospace", color: "#0E1F33" }}>
+            New password.
+          </h1>
+          <p className="text-sm mb-7" style={{ color: "#8FA3B1" }}>
+            Choose a strong password for your account.
+          </p>
+          <form onSubmit={handleReset} className="flex flex-col gap-4">
+            <Field label="New password" id="rnpw">
+              <div className="relative">
+                <Input id="rnpw" type={showNewPassword ? "text" : "password"} placeholder="Min. 8 chars, 1 uppercase, 1 number"
+              	  value={passwords.newPassword}
+              	  onChange={(e) => setPasswords((p) => ({ ...p, newPassword: e.target.value }))}
+              	  required />
+                <PasswordToggle show={showNewPassword} toggle={() => setShowNewPassword(!showNewPassword)} />
+              </div>
+            </Field>
+            <Field label="Confirm new password" id="rcpw">
+              <div className="relative">
+                <Input id="rcpw" type={showConfirmPassword ? "text" : "password"} placeholder="Repeat password"
+              	  value={passwords.confirmPassword}
+              	  onChange={(e) => setPasswords((p) => ({ ...p, confirmPassword: e.target.value }))}
+              	  required />
+                <PasswordToggle show={showConfirmPassword} toggle={() => setShowConfirmPassword(!showConfirmPassword)} />
+              </div>
+            </Field>
+            <ErrorBanner message={error} />
+            <PrimaryBtn type="submit" loading={loading}>Set new password</PrimaryBtn>
+          </form>
+        </>
+      )}
+
+      {/* ── Step 4: Done ── */}
+      {step === "done" && (
         <>
           <div className="w-10 h-10 rounded-full flex items-center justify-center mb-5"
             style={{ background: "rgba(79,174,132,0.1)" }}>
@@ -248,36 +435,12 @@ function ForgotCard({ view, setView }) {
             </svg>
           </div>
           <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Space Mono', monospace", color: "#0E1F33" }}>
-            Check your inbox.
+            Password updated.
           </h1>
           <p className="text-sm mb-7" style={{ color: "#8FA3B1" }}>
-            We sent a reset link to <strong style={{ color: "#0E1F33" }}>{email}</strong>. It expires in 15 minutes.
+            Your password has been reset. You can now sign in with your new password.
           </p>
-          <button onClick={() => setView("login")}
-            className="text-sm font-semibold" style={{ color: "#F2A93B", background: "none", border: "none", cursor: "pointer" }}>
-            ← Back to sign in
-          </button>
-        </>
-      ) : (
-        <>
-          <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Space Mono', monospace", color: "#0E1F33" }}>
-            Reset password.
-          </h1>
-          <p className="text-sm mb-7" style={{ color: "#8FA3B1" }}>
-            Enter your email and we'll send a reset link.
-          </p>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <Field label="Email" id="femail">
-              <Input id="femail" type="email" placeholder="you@example.com"
-                value={email} onChange={(e) => setEmail(e.target.value)} required />
-            </Field>
-            <ErrorBanner message={error} />
-            <PrimaryBtn type="submit" loading={loading}>Send reset link</PrimaryBtn>
-          </form>
-          <button onClick={() => setView("login")} className="mt-5 text-sm font-semibold flex items-center gap-1"
-            style={{ color: "#8FA3B1", background: "none", border: "none", cursor: "pointer" }}>
-            ← Back to sign in
-          </button>
+          <PrimaryBtn onClick={() => setView("login")}>Back to sign in</PrimaryBtn>
         </>
       )}
     </div>
@@ -328,6 +491,7 @@ function Divider() {
 
 function GoogleBtn() {
   const handleGoogleAuth = () => {
+    // Redirect to backend — passport takes over from here
     const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
     window.location.href = `${apiUrl}/auth/google`;
   };
@@ -346,6 +510,7 @@ function GoogleBtn() {
         <path fill="#FBBC05" d="M10.66 28.54A14.47 14.47 0 0 1 9.5 24c0-1.58.27-3.1.75-4.54l-8.04-6.24A23.96 23.96 0 0 0 0 24c0 3.87.93 7.53 2.21 10.78l8.45-6.24z"/>
         <path fill="#34A853" d="M24 48c6.48 0 11.92-2.13 15.89-5.8l-7.63-5.92c-2.12 1.42-4.83 2.27-8.26 2.27-6.18 0-11.44-4.18-13.34-9.96l-8.45 6.24C6.56 42.62 14.64 48 24 48z"/>
       </svg>
+      
       Continue with Google
     </button>
   );

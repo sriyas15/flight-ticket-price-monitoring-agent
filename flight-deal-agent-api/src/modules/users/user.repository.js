@@ -58,6 +58,38 @@ const UserRepository = {
       passwordResetExpires: null,
     }).exec(),
 
+  // ── OTP ──────────────────────────────────────────────────────────────────
+
+  setOtp: (id, otpHash, otpExpires) =>
+    User.findByIdAndUpdate(id, { otpHash, otpExpires }).exec(),
+
+  findByIdWithOtp: (id) =>
+    User.findById(id).select("+otpHash +otpExpires").exec(),
+
+  clearOtp: (id) =>
+    User.findByIdAndUpdate(id, { otpHash: null, otpExpires: null }).exec(),
+
+  setPasswordResetToken: (id, token, expires) =>
+    User.findByIdAndUpdate(id, {
+      passwordResetToken: token,
+      passwordResetExpires: expires,
+    }).exec(),
+
+  findByResetToken: (token) =>
+    User.findOne({
+      passwordResetToken: token,
+      passwordResetExpires: { $gt: Date.now() },
+    })
+      .select("+passwordResetToken +passwordResetExpires")
+      .exec(),
+
+  clearPasswordReset: (id, newPasswordHash) =>
+    User.findByIdAndUpdate(id, {
+      password: newPasswordHash,
+      passwordResetToken: null,
+      passwordResetExpires: null,
+    }).exec(),
+
   existsByEmail: async (email) => {
     const count = await User.countDocuments({ email: email.toLowerCase().trim() });
     return count > 0;

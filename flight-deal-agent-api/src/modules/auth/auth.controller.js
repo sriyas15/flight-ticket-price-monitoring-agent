@@ -157,12 +157,27 @@ export const forgotPassword = async (req, res, next) => {
 };
 
 /**
+ * POST /api/auth/verify-otp
+ * Verifies the 6-digit OTP and returns a short-lived resetToken.
+ */
+export const verifyOtp = async (req, res, next) => {
+  try {
+    const { email, otp } = req.body;
+    const result = await AuthService.verifyOtp(email, otp);
+    return sendSuccess(res, 200, "OTP verified", { resetToken: result.resetToken });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * POST /api/auth/reset-password
+ * Accepts the resetToken (from verifyOtp) + new password.
  */
 export const resetPassword = async (req, res, next) => {
   try {
-    const { token, password } = req.body;
-    const result = await AuthService.resetPassword(token, password);
+    const { resetToken, password } = req.body;
+    const result = await AuthService.resetPassword(resetToken, password);
     return sendSuccess(res, 200, result.message);
   } catch (err) {
     next(err);

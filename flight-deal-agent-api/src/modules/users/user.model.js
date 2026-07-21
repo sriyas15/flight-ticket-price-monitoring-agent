@@ -8,14 +8,12 @@ const userSchema = new mongoose.Schema(
       trim: true,
       maxlength: [50, "First name must be 50 characters or less"],
     },
-
     lastName: {
       type: String,
       trim: true,
       maxlength: [50, "Last name must be 50 characters or less"],
       default: "",
     },
-
     email: {
       type: String,
       required: [true, "Email is required"],
@@ -24,14 +22,11 @@ const userSchema = new mongoose.Schema(
       trim: true,
       match: [/^\S+@\S+\.\S+$/, "Please enter a valid email address"],
     },
-
     password: {
       type: String,
-      // Not required at schema level — Google OAuth users won't have one
       minlength: [8, "Password must be at least 8 characters"],
-      select: false,   // never returned in queries unless explicitly requested
+      select: false,
     },
-
     role: {
       type: String,
       enum: ["user", "admin"],
@@ -60,7 +55,6 @@ const userSchema = new mongoose.Schema(
     },
 
     // ── Refresh token (hashed) ─────────────────────
-    // Stored so we can invalidate on logout / rotation
     refreshTokenHash: {
       type: String,
       select: false,
@@ -73,7 +67,21 @@ const userSchema = new mongoose.Schema(
       default: true,
     },
 
-    // ── Password reset ─────────────────────────────
+    // ── OTP (password reset) ───────────────────────
+    // Hashed 6-digit OTP + expiry. Never store plain OTP.
+    otpHash: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    otpExpires: {
+      type: Date,
+      select: false,
+      default: null,
+    },
+
+    // ── Password reset token ───────────────────────
+    // Short-lived JWT issued after OTP is verified.
     passwordResetToken: {
       type: String,
       select: false,
@@ -86,20 +94,16 @@ const userSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,   // createdAt, updatedAt
+    timestamps: true,
     versionKey: false,
   }
 );
 
-// ── Indexes ─────────────────────────────────────
+// ── Indexes ──────────────────────────────────────
+userSchema.index({ email: 1 });
 userSchema.index({ googleId: 1 }, { sparse: true });
 
-// ── Instance methods ─────────────────────────────
-
-/**
- * Return a safe public representation — never include
- * password, tokens, or internal fields.
- */
+// ── Instance methods ──────────────────────────────
 userSchema.methods.toPublicProfile = function () {
   return {
     id: this._id,

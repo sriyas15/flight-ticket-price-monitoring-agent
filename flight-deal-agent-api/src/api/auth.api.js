@@ -8,6 +8,6 @@ export const authApi = {
   me: () => api.get("/auth/me"),
   forgotPassword: (email) => api.post("/auth/forgot-password", { email }),
   verifyOtp: (email, otp) => api.post("/auth/verify-otp", { email, otp }),
-  resetPassword: (token, password) =>
-    api.post("/auth/reset-password", { resetToken: token, password }),
+  resetPassword: (resetToken, password) =>
+    api.post("/auth/reset-password", { resetToken, password }),
 };
