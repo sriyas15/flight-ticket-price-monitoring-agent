@@ -150,7 +150,7 @@ export default function DashboardPage() {
                       fontSize: 10, letterSpacing: "0.14em",
                       textTransform: "uppercase", color: "#8FA3B1",
                     }}>
-                      Price history · {route.origin} → {route.destination}
+                      Price history · {route.origin}{route.isExplore ? " → 🌍 Any" : ` → ${route.destination}`}
                     </span>
                     <button
                       onClick={() => priceHistory.fetchHistory(route._id, 30)}
@@ -245,16 +245,20 @@ function RouteRow({ route, onEdit, onPause, onDelete, onToggleChart, deleting, c
         <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 15, fontWeight: 700, color: "#0E1F33" }}>
           {route.origin}
           <span style={{ color: "#F2A93B", margin: "0 6px", fontWeight: 400 }}>→</span>
-          {route.destination}
+          {route.isExplore
+            ? <span style={{ color: "#4FAE84" }}>🌍 Any</span>
+            : route.destination}
         </div>
         <div className="text-xs" style={{ color: "#8FA3B1" }}>{dateLabel()}</div>
       </div>
 
       {/* Target */}
       <div className="text-sm" style={{ fontFamily: "'Space Mono', monospace", color: "#5C7589" }}>
-        {route.targetPrice
-          ? `₹${route.targetPrice.toLocaleString("en-IN")}`
-          : `≥${route.alertThresholdPct}% drop`}
+        {route.isExplore
+          ? <span style={{ background: "rgba(79,174,132,0.1)", color: "#2D8A63", borderRadius: 4, padding: "2px 7px", fontSize: 11, fontWeight: 700 }}>Explore</span>
+          : route.targetPrice
+            ? `₹${route.targetPrice.toLocaleString("en-IN")}`
+            : `≥${route.alertThresholdPct}% drop`}
       </div>
 
       {/* Last price */}

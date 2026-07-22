@@ -7,10 +7,23 @@ export const createRouteValidation = [
     .notEmpty().withMessage("Origin is required")
     .isLength({ min: 3, max: 3 }).withMessage("Origin must be a 3-letter IATA code"),
 
+  body("isExplore")
+    .optional()
+    .isBoolean().withMessage("isExplore must be a boolean"),
+
   body("destination")
+    .optional({ nullable: true })
     .trim().toUpperCase()
-    .notEmpty().withMessage("Destination is required")
-    .isLength({ min: 3, max: 3 }).withMessage("Destination must be a 3-letter IATA code"),
+    .custom((val, { req }) => {
+      const explore = req.body.isExplore === true || req.body.isExplore === "true";
+      if (!explore && !val) {
+        throw new Error("Destination is required unless isExplore is true");
+      }
+      if (val && val.length !== 3) {
+        throw new Error("Destination must be a 3-letter IATA code");
+      }
+      return true;
+    }),
 
   body("departureDateFrom")
     .notEmpty().withMessage("Departure date is required")

@@ -149,6 +149,61 @@ const TelegramProvider = {
   },
 
   /**
+   * Send a consolidated "cheapest destinations" digest for an explore route.
+   *
+   * @param {string}   chatId
+   * @param {Object}   route       - FlightRoute document (isExplore=true)
+   * @param {Array}    destinations - Sorted array of {destination, price, currency, departureDate, bookingLink, airline}
+   */
+  sendExploreReport: async (chatId, route, destinations) => {
+    const bot = getBot();
+    const currency = route.currency ?? "INR";
+    const cabin    = (route.cabinClass ?? "economy")
+      .replace("_", " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+    const pax      = route.passengers ?? 1;
+
+    // Date window label
+    const windowStart = route.departureDateFrom;
+    const windowEnd   = route.departureDateTo;
+    const windowLine  = windowEnd
+      ? `📅 ${esc(_fmtFull(windowStart))} – ${esc(_fmtFull(windowEnd))}\n`
+      : `📅 ${esc(_fmtFull(windowStart))}\n`;
+
+    // Header
+    const header =
+      `🌍 *Cheapest Destinations from ${esc(route.origin)}*\n\n` +
+      windowLine +
+      `✈️  ${esc(cabin)}  ·  ${esc(pax === 1 ? "1 Adult" : `${pax} Adults`)}\n\n`;
+
+    // Destination list — top 8
+    const top = destinations.slice(0, 8);
+    const rows = top.map((d, i) => {
+      const rank  = ["🥇","🥈","🥉","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣"][i] ?? `${i + 1}\\.`;
+      const dest  = esc(d.destination);
+      const price = esc(_price(d.price, currency));
+      const date  = d.departureDate ? `  📆 ${esc(_fmtDay(d.departureDate))}` : "";
+      return `${rank} *${dest}*  —  ${price}${date}`;
+    });
+
+    const listText = rows.join("\n") + "\n";
+
+    // Best deal booking link
+    const best = top[0];
+    const bookLine = best
+      ? `\n[Book cheapest ↗](${best.bookingLink})`
+      : "";
+
+    const text = header + listText + bookLine;
+
+    await bot.sendMessage(chatId, text, {
+      parse_mode: "MarkdownV2",
+      disable_web_page_preview: true,
+    });
+    logger.info(`Telegram explore report sent to chat ${chatId} for origin ${route.origin} (${top.length} destinations)`);
+  },
+
+  /**
    * Send a daily price report for a route.
    *
    * @param {string}      chatId

@@ -79,6 +79,64 @@ const NotificationService = {
     );
     return false;
   },
+
+  /**
+   * Deliver an explore-mode digest (cheapest destinations list) to the user.
+   * Uses same retry/backoff pattern as sendDealAlert.
+   *
+   * @param {Object} params
+   * @param {Object} params.user         - User document
+   * @param {Object} params.route        - FlightRoute (isExplore=true)
+   * @param {Array}  params.destinations - Sorted array of destination results
+   * @param {string} params.agentRunId
+   * @returns {Promise<boolean>}
+   */
+  sendExploreAlert: async ({ user, route, destinations, agentRunId }) => {
+    const channel = _resolveChannel(user);
+    if (!channel) {
+      logger.warn(`User ${user._id} has no notification channel — skipping explore alert`);
+      return false;
+    }
+
+    const cheapest = destinations[0];
+
+    // Log with the cheapest price for record-keeping
+    const alertLog = await AlertRepository.createAlertLog({
+      routeId: route._id,
+      userId: user._id,
+      priceAtAlert: cheapest?.price ?? null,
+      baselineAtAlert: route.baselinePrice,
+      dropPct: null,
+      currency: cheapest?.currency ?? route.currency,
+      channel,
+      status: DEAL_STATUS.FLAGGED,
+      agentRunId,
+    });
+
+    let lastError = null;
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        if (attempt > 0) {
+          await _sleep(RETRY_DELAYS_MS[attempt - 1]);
+          logger.debug(`Retrying explore alert delivery (attempt ${attempt + 1}) for route ${route._id}`);
+        }
+
+        await _deliverExplore(channel, user, route, destinations);
+
+        await AlertRepository.updateAlertStatus(alertLog._id, DEAL_STATUS.SENT);
+        logger.info(`Explore alert delivered via ${channel} for route ${route._id}`);
+        return true;
+      } catch (err) {
+        lastError = err;
+        logger.warn(`Explore alert attempt ${attempt + 1} failed: ${err.message}`);
+      }
+    }
+
+    await AlertRepository.updateAlertStatus(alertLog._id, DEAL_STATUS.FAILED, lastError?.message);
+    logger.error(`Explore alert failed after ${MAX_RETRIES} attempts for route ${route._id}: ${lastError?.message}`);
+    return false;
+  },
 };
 
 // ── Private helpers ───────────────────────────────────────────────────────
@@ -110,6 +168,25 @@ const _deliver = async (channel, user, route, result, dropPct, isDeal) => {
   }
 };
 
+const _deliverExplore = async (channel, user, route, destinations) => {
+  switch (channel) {
+    case ALERT_CHANNEL.TELEGRAM:
+      await TelegramProvider.sendExploreReport(
+        user.telegramChatId,
+        route,
+        destinations
+      );
+      break;
+
+    case ALERT_CHANNEL.WHATSAPP:
+      throw new Error("WhatsApp provider not yet implemented");
+
+    default:
+      throw new Error(`Unknown notification channel: ${channel}`);
+  }
+};
+
 const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export default NotificationService;
+

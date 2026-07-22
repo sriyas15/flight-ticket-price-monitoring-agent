@@ -3,6 +3,7 @@ import { Field, Input, Select, PrimaryBtn, GhostBtn, ErrorBanner } from "../ui/i
 
 const EMPTY = {
   origin: "", destination: "",
+  isExplore: false,
   departureDateFrom: "", departureDateTo: "",
   returnDateFrom: "", returnDateTo: "",
   tripType: "one_way", cabinClass: "economy",
@@ -20,6 +21,7 @@ export default function RouteModal({ open, onClose, onSave, editRoute = null }) 
       setForm({
         origin: editRoute.origin ?? "",
         destination: editRoute.destination ?? "",
+        isExplore: editRoute.isExplore ?? false,
         departureDateFrom: editRoute.departureDateFrom?.slice(0, 10) ?? "",
         departureDateTo: editRoute.departureDateTo?.slice(0, 10) ?? "",
         returnDateFrom: editRoute.returnDateFrom?.slice(0, 10) ?? "",
@@ -38,17 +40,18 @@ export default function RouteModal({ open, onClose, onSave, editRoute = null }) 
   }, [editRoute, open]);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const toggle = (k) => () => setForm((f) => ({ ...f, [k]: !f[k] }));
 
   const handleSave = async (e) => {
     e.preventDefault();
     setError("");
 
     if (!form.origin || form.origin.length !== 3) {
-      setError("Origin must be a 3-letter IATA code (e.g. MAA).");
+      setError("Origin must be a 3-letter IATA code (e.g. DEL).");
       return;
     }
-    if (!form.destination || form.destination.length !== 3) {
-      setError("Destination must be a 3-letter IATA code (e.g. DXB).");
+    if (!form.isExplore && (!form.destination || form.destination.length !== 3)) {
+      setError("Destination must be a 3-letter IATA code (e.g. DXB), or enable Explore mode.");
       return;
     }
     if (!form.departureDateFrom) {
@@ -61,7 +64,8 @@ export default function RouteModal({ open, onClose, onSave, editRoute = null }) 
       const payload = {
         ...form,
         origin: form.origin.toUpperCase(),
-        destination: form.destination.toUpperCase(),
+        destination: form.isExplore ? null : form.destination.toUpperCase(),
+        isExplore: form.isExplore,
         passengers: Number(form.passengers),
         targetPrice: form.targetPrice !== "" ? Number(form.targetPrice) : null,
         alertThresholdPct: Number(form.alertThresholdPct),
@@ -85,6 +89,8 @@ export default function RouteModal({ open, onClose, onSave, editRoute = null }) 
 
   if (!open) return null;
 
+  const isEdit = !!editRoute;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -105,10 +111,10 @@ export default function RouteModal({ open, onClose, onSave, editRoute = null }) 
         <div className="px-8 pt-8 pb-0 flex items-start justify-between">
           <div>
             <h3 style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: "#0E1F33", margin: 0 }}>
-              {editRoute ? "Edit route" : "Add a route"}
+              {isEdit ? "Edit route" : "Add a route"}
             </h3>
             <p className="text-sm mt-1" style={{ color: "#8FA3B1" }}>
-              {editRoute ? "Update your monitoring criteria." : "Set up a new flight to monitor."}
+              {isEdit ? "Update your monitoring criteria." : "Set up a new flight to monitor."}
             </p>
           </div>
           <button
@@ -122,19 +128,68 @@ export default function RouteModal({ open, onClose, onSave, editRoute = null }) 
 
         <form onSubmit={handleSave} className="px-8 py-6 flex flex-col gap-4">
 
-          {/* Origin / Destination */}
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Origin (IATA)" id="origin">
-              <Input id="origin" placeholder="MAA" maxLength={3}
-                value={form.origin} onChange={set("origin")}
-                style={{ textTransform: "uppercase" }} required />
-            </Field>
+          {/* Origin */}
+          <Field label="Origin (IATA)" id="origin">
+            <Input id="origin" placeholder="DEL" maxLength={3}
+              value={form.origin} onChange={set("origin")}
+              style={{ textTransform: "uppercase" }}
+              disabled={isEdit}
+              required />
+          </Field>
+
+          {/* Explore toggle */}
+          {!isEdit && (
+            <button
+              type="button"
+              onClick={toggle("isExplore")}
+              className="flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all"
+              style={{
+                background: form.isExplore ? "rgba(79,174,132,0.07)" : "#F7F5F1",
+                border: `1.5px solid ${form.isExplore ? "rgba(79,174,132,0.35)" : "#EAE6E0"}`,
+                cursor: "pointer",
+              }}
+            >
+              {/* Toggle pill */}
+              <div
+                className="flex-shrink-0 rounded-full transition-all"
+                style={{
+                  width: 36, height: 20,
+                  background: form.isExplore ? "#4FAE84" : "#D1C9BE",
+                  position: "relative",
+                }}
+              >
+                <div style={{
+                  position: "absolute", top: 3,
+                  left: form.isExplore ? 19 : 3,
+                  width: 14, height: 14,
+                  borderRadius: "50%", background: "#fff",
+                  transition: "left 0.18s ease",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                }} />
+              </div>
+              <div>
+                <div className="text-sm font-semibold" style={{ color: form.isExplore ? "#2D8A63" : "#0E1F33" }}>
+                  🌍 Explore mode — any destination
+                </div>
+                <div className="text-xs mt-0.5" style={{ color: "#8FA3B1" }}>
+                  {form.isExplore
+                    ? "We'll find the cheapest destinations from your origin"
+                    : "Monitor a specific origin → destination route"}
+                </div>
+              </div>
+            </button>
+          )}
+
+          {/* Destination (hidden in explore mode) */}
+          {!form.isExplore && (
             <Field label="Destination (IATA)" id="dest">
               <Input id="dest" placeholder="DXB" maxLength={3}
                 value={form.destination} onChange={set("destination")}
-                style={{ textTransform: "uppercase" }} required />
+                style={{ textTransform: "uppercase" }}
+                disabled={isEdit}
+                required={!form.isExplore} />
             </Field>
-          </div>
+          )}
 
           {/* Dates */}
           <div className="grid grid-cols-2 gap-3">
@@ -186,9 +241,10 @@ export default function RouteModal({ open, onClose, onSave, editRoute = null }) 
               <Input id="pax" type="number" min={1} max={9}
                 value={form.passengers} onChange={set("passengers")} />
             </Field>
-            <Field label="Target price (₹)" id="tp">
+            <Field label="Target price ₹ (optional)" id="tp">
               <Input id="tp" type="number" min={0} placeholder="e.g. 18500"
-                value={form.targetPrice} onChange={set("targetPrice")} />
+                value={form.targetPrice} onChange={set("targetPrice")}
+                disabled={form.isExplore} />
             </Field>
           </div>
 
@@ -205,7 +261,7 @@ export default function RouteModal({ open, onClose, onSave, editRoute = null }) 
           <div className="flex justify-end gap-3 pt-1">
             <GhostBtn type="button" onClick={onClose}>Cancel</GhostBtn>
             <PrimaryBtn type="submit" loading={loading} className="w-auto px-6">
-              {editRoute ? "Update route" : "Save route"}
+              {isEdit ? "Update route" : "Save route"}
             </PrimaryBtn>
           </div>
         </form>

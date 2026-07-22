@@ -1,4 +1,5 @@
 import logger from "../../config/logger.js";
+import { getExploreDestinations } from "../../config/explore-destinations.js";
 
 // ── Base fare table — realistic INR ballpark prices ──
 const BASE_FARES = {
@@ -101,6 +102,32 @@ const MockFlightProvider = {
       bookingLink: `https://www.google.com/flights?q=${origin}+to+${destination}`,
       fetchedAt: new Date(),
     };
+  },
+
+  /**
+   * Explore mode: fan out to all destinations in the pool, return sorted results.
+   *
+   * @param {Object} params - Same as fetchLowestFare but without destination
+   * @returns {Promise<Array<{destination, price, departureDate, bookingLink, currency}>>}
+   */
+  fetchCheapestDestinations: async (params) => {
+    const destinations = getExploreDestinations(params.origin);
+    logger.debug(`[MockProvider] Explore mode for ${params.origin} — querying ${destinations.length} destinations`);
+
+    const results = await Promise.all(
+      destinations.map(async (dest) => {
+        try {
+          const result = await MockFlightProvider.fetchLowestFare({ ...params, destination: dest });
+          return result ? { ...result, destination: dest } : null;
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    return results
+      .filter(Boolean)
+      .sort((a, b) => a.price - b.price);
   },
 };
 

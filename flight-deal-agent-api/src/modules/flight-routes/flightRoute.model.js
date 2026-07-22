@@ -26,10 +26,18 @@ const flightRouteSchema = new mongoose.Schema(
     },
     destination: {
       type: String,
-      required: [true, "Destination is required"],
+      required: false,   // optional for explore (any-destination) routes
       uppercase: true,
       trim: true,
       maxlength: 3,
+      default: null,
+    },
+
+    // ── Explore mode (no specific destination) ─────
+    isExplore: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
 
     // ── Travel dates ───────────────────────────────

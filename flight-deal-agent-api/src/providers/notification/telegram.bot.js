@@ -71,11 +71,15 @@ export const startBotListener = () => {
         return;
       }
 
-      const lines = routes.map((r, i) =>
-        `${i + 1}. *${r.origin} → ${r.destination}* (${r.status})\n` +
-        `   ID: \`${r._id}\`\n` +
-        `   Target: ${r.targetPrice ? `₹${r.targetPrice.toLocaleString("en-IN")}` : `≥${r.alertThresholdPct}% drop`}`
-      );
+      const lines = routes.map((r, i) => {
+        const destLabel = r.isExplore ? "🌍 Any" : r.destination;
+        const targetLabel = r.isExplore 
+          ? "Explore Mode" 
+          : (r.targetPrice ? `₹${r.targetPrice.toLocaleString("en-IN")}` : `≥${r.alertThresholdPct}% drop`);
+        return `${i + 1}. *${r.origin} → ${destLabel}* (${r.status})\n` +
+               `   ID: \`${r._id}\`\n` +
+               `   Target: ${targetLabel}`;
+      });
 
       await _pollingBot.sendMessage(
         chatId,

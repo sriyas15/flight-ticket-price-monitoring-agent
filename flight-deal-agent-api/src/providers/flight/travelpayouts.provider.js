@@ -1,6 +1,7 @@
 import axios from "axios";
 import env from "../../config/env.js";
 import logger from "../../config/logger.js";
+import { getExploreDestinations } from "../../config/explore-destinations.js";
 
 const BASE_URL = "https://api.travelpayouts.com/v1/prices";
 
@@ -147,6 +148,80 @@ const TravelpayoutsProvider = {
       fetchedAt: new Date(),
       expiresAt: best.expires_at ? new Date(best.expires_at) : null,
     };
+  },
+
+  /**
+   * Explore mode: use /v2/prices/cheap to get cheapest destinations from an origin.
+   * Falls back to fanning out via fetchLowestFare if the endpoint returns no data.
+   *
+   * @param {Object} params - { origin, departureDateFrom, cabinClass, currency, passengers }
+   * @returns {Promise<Array<{destination, price, departureDate, bookingLink, currency}>>}
+   */
+  fetchCheapestDestinations: async (params) => {
+    const { origin, departureDateFrom, cabinClass = "economy", currency = "INR", passengers = 1 } = params;
+
+    if (!env.TRAVELPAYOUTS_API_TOKEN) {
+      throw new Error("TRAVELPAYOUTS_API_TOKEN is not set in environment");
+    }
+
+    const departMonth = _toYYYYMM(departureDateFrom);
+
+    try {
+      // ── Try the /v2/prices/cheap endpoint first ───────────────────────
+      const response = await axios.get("https://api.travelpayouts.com/v2/prices/cheap", {
+        params: {
+          origin,
+          depart_date: departMonth,
+          currency: currency.toUpperCase(),
+          trip_class: CABIN_MAP[cabinClass] ?? 0,
+          token: env.TRAVELPAYOUTS_API_TOKEN,
+        },
+        headers: { "x-access-token": env.TRAVELPAYOUTS_API_TOKEN },
+        timeout: 10_000,
+      });
+
+      const body = response.data;
+      if (body?.success && body?.data && Object.keys(body.data).length) {
+        // Shape: { data: { "BKK": { price, departure_at, airline, transfers }, ... } }
+        const results = Object.entries(body.data)
+          .map(([dest, entry]) => ({
+            destination: dest,
+            price: entry.price,
+            currency: currency.toUpperCase(),
+            origin,
+            departureDate: entry.departure_at?.slice(0, 10) ?? departureDateFrom,
+            airline: entry.airline ?? null,
+            transfers: entry.transfers ?? null,
+            provider: "travelpayouts",
+            bookingLink: bookingLink(origin, dest, entry.departure_at?.slice(0, 10), currency),
+            fetchedAt: new Date(),
+          }))
+          .filter((r) => r.price)
+          .sort((a, b) => a.price - b.price);
+
+        if (results.length > 0) {
+          logger.debug(`[Travelpayouts] Explore: found ${results.length} destinations from ${origin}`);
+          return results;
+        }
+      }
+    } catch (err) {
+      logger.warn(`[Travelpayouts] /v2/prices/cheap failed for ${origin}: ${err.message} — falling back to fan-out`);
+    }
+
+    // ── Fallback: fan out via fetchLowestFare ──────────────────────────
+    logger.debug(`[Travelpayouts] Explore fallback fan-out for ${origin}`);
+    const destinations = getExploreDestinations(origin);
+    const results = await Promise.all(
+      destinations.map(async (dest) => {
+        try {
+          const result = await TravelpayoutsProvider.fetchLowestFare({ ...params, destination: dest });
+          return result ? { ...result, destination: dest } : null;
+        } catch {
+          return null;
+        }
+      })
+    );
+    return results.filter(Boolean).sort((a, b) => a.price - b.price);
   },
 };
 
