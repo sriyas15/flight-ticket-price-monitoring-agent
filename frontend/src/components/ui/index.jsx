@@ -188,3 +188,6 @@ export const ErrorBanner = ({ message }) =>
       {message}
     </div>
   ) : null;
+
+// ── Airport Autocomplete ──────────────────────────────────────────────────
+export { AirportAutocomplete } from "./AirportAutocomplete.jsx";

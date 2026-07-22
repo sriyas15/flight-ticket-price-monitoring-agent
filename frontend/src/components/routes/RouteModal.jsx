@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Field, Input, Select, PrimaryBtn, GhostBtn, ErrorBanner } from "../ui/index.jsx";
+import { Field, Input, Select, PrimaryBtn, GhostBtn, ErrorBanner, AirportAutocomplete } from "../ui/index.jsx";
 
 const EMPTY = {
   origin: "", destination: "",
@@ -130,11 +130,14 @@ export default function RouteModal({ open, onClose, onSave, editRoute = null }) 
 
           {/* Origin */}
           <Field label="Origin (IATA)" id="origin">
-            <Input id="origin" placeholder="DEL" maxLength={3}
-              value={form.origin} onChange={set("origin")}
-              style={{ textTransform: "uppercase" }}
+            <AirportAutocomplete
+              id="origin"
+              placeholder="DEL"
+              value={form.origin}
+              onChange={set("origin")}
               disabled={isEdit}
-              required />
+              required
+            />
           </Field>
 
           {/* Explore toggle */}
@@ -183,11 +186,14 @@ export default function RouteModal({ open, onClose, onSave, editRoute = null }) 
           {/* Destination (hidden in explore mode) */}
           {!form.isExplore && (
             <Field label="Destination (IATA)" id="dest">
-              <Input id="dest" placeholder="DXB" maxLength={3}
-                value={form.destination} onChange={set("destination")}
-                style={{ textTransform: "uppercase" }}
+              <AirportAutocomplete
+                id="dest"
+                placeholder="DXB"
+                value={form.destination}
+                onChange={set("destination")}
                 disabled={isEdit}
-                required={!form.isExplore} />
+                required={!form.isExplore}
+              />
             </Field>
           )}
 
