@@ -142,17 +142,33 @@ function TelegramSection({ user, onConnect, onDisconnect }) {
         {!isConnected && (
           <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: "#F7F5F1", border: "1px solid #EAE6E0" }}>
             <p className="text-xs font-semibold" style={{ color: "#0E1F33" }}>How to connect</p>
-            {[
-              ["1", `Search Telegram for your bot and send /start`],
-              ["2", "Search @userinfobot → send /start → it replies with your Chat ID"],
-              ["3", "Paste the numeric ID below — we'll send a verification message"],
-            ].map(([n, text]) => (
-              <div key={n} className="flex items-start gap-2.5">
-                <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                  style={{ background: "#F2A93B", color: "#23150A", fontFamily: "'Space Mono', monospace" }}>{n}</span>
-                <span className="text-xs leading-relaxed" style={{ color: "#5C7589" }}>{text}</span>
-              </div>
-            ))}
+            <div className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                style={{ background: "#F2A93B", color: "#23150A", fontFamily: "'Space Mono', monospace" }}>1</span>
+              <span className="text-xs leading-relaxed" style={{ color: "#5C7589" }}>
+                Open Telegram and start a chat with{" "}
+                <a href="https://t.me/FlightTicketAgentBot" target="_blank" rel="noreferrer"
+                  style={{ color: "#2B7BE9", fontWeight: 600 }}>@FlightTicketAgentBot</a>
+                {" "}— send <code style={{ background: "#EAE6E0", borderRadius: 3, padding: "0 3px", fontSize: 11 }}>/start</code> to activate the bot
+              </span>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                style={{ background: "#F2A93B", color: "#23150A", fontFamily: "'Space Mono', monospace" }}>2</span>
+              <span className="text-xs leading-relaxed" style={{ color: "#5C7589" }}>
+                Then search for{" "}
+                <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer"
+                  style={{ color: "#2B7BE9", fontWeight: 600 }}>@userinfobot</a>
+                {" "}— send <code style={{ background: "#EAE6E0", borderRadius: 3, padding: "0 3px", fontSize: 11 }}>/start</code> and it replies with your numeric Chat ID
+              </span>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                style={{ background: "#F2A93B", color: "#23150A", fontFamily: "'Space Mono', monospace" }}>3</span>
+              <span className="text-xs leading-relaxed" style={{ color: "#5C7589" }}>
+                Paste that numeric ID below — we'll send a verification message to confirm
+              </span>
+            </div>
           </div>
         )}
 

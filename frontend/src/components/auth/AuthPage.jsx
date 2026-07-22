@@ -158,11 +158,11 @@ function RegisterForm({ setView }) {
       <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-3">
           <Field label="First name" id="fname">
-            <Input id="fname" type="text" placeholder="Riyas"
+            <Input id="fname" type="text" placeholder="John"
               value={form.firstName} onChange={set("firstName")} required />
           </Field>
           <Field label="Last name" id="lname">
-            <Input id="lname" type="text" placeholder="Mohamed"
+            <Input id="lname" type="text" placeholder="Doe"
               value={form.lastName} onChange={set("lastName")} />
           </Field>
         </div>
