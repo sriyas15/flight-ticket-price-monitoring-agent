@@ -7,7 +7,7 @@ const BASE_URL = "https://api.travelpayouts.com/v1/prices";
 // Cabin class → trip_class integer (Travelpayouts uses 0/1/2)
 const CABIN_MAP = {
   economy: 0,
-  premium_economy: 0, // no premium_economy in TP — treat as economy
+  premium_economy: 0,
   business: 1,
   first: 2,
 };
@@ -20,26 +20,18 @@ const bookingLink = (origin, destination, departDate, currency) =>
  * TravelpayoutsProvider
  *
  * Uses the /v1/prices/calendar endpoint — returns cheapest tickets per day
- * for a given month. We pick the single lowest price across all returned
- * dates to get the "best fare" for the route in that window.
- *
- * Docs: https://travelpayouts.github.io/slate/#tickets-for-each-day-of-a-month
- *
- * Rate limit: 10 req/second — BullMQ worker concurrency=1 is safe.
- * Data freshness: cached from last 48h of user searches on Aviasales.
+ * for a given month. We filter to the user's date window, pick the cheapest
+ * day, and return a full day-by-day price list for the report.
  */
 const TravelpayoutsProvider = {
   name: "travelpayouts",
 
-  /**
-   * @param {Object} params - See provider.interface.js
-   * @returns {Promise<import('./provider.interface.js').FlightResult | null>}
-   */
   fetchLowestFare: async (params) => {
     const {
       origin,
       destination,
       departureDateFrom,
+      departureDateTo,
       returnDateFrom,
       tripType,
       cabinClass = "economy",
@@ -50,12 +42,9 @@ const TravelpayoutsProvider = {
       throw new Error("TRAVELPAYOUTS_API_TOKEN is not set in environment");
     }
 
-    // Calendar endpoint needs yyyy-mm (month granularity)
     const departMonth = _toYYYYMM(departureDateFrom);
     if (!departMonth) {
-      logger.warn(
-        `[Travelpayouts] Invalid departureDateFrom: ${departureDateFrom}`,
-      );
+      logger.warn(`[Travelpayouts] Invalid departureDateFrom: ${departureDateFrom}`);
       return null;
     }
 
@@ -65,103 +54,159 @@ const TravelpayoutsProvider = {
       depart_date: departMonth,
       calendar_type: "departure_date",
       currency: currency.toUpperCase(),
+      trip_class: CABIN_MAP[cabinClass] ?? 0,
       token: env.TRAVELPAYOUTS_API_TOKEN,
     };
 
-    // Add return month for round trips
     if (tripType === "round_trip" && returnDateFrom) {
       query.return_date = _toYYYYMM(returnDateFrom);
     }
 
     logger.debug(
-      `[Travelpayouts] Fetching ${origin}→${destination} for ${departMonth}`,
+      `[Travelpayouts] Fetching ${origin}→${destination} for ${departMonth} ` +
+      `(cabin: ${cabinClass}, range: ${departureDateFrom} → ${departureDateTo ?? "single day"})`,
     );
 
-    try {
-      const { data: body } = await axios.get(`${BASE_URL}/calendar`, {
-        params: query,
-        headers: {
-          "x-access-token": env.TRAVELPAYOUTS_API_TOKEN,
-          "Accept-Encoding": "gzip, deflate",
-        },
-        timeout: 10_000,
-      });
+    // ── Fetch with local 429 retry (up to 3 attempts) ─────────────────────
+    const MAX_ATTEMPTS = 3;
+    const RETRY_DELAYS_MS = [5_000, 10_000];
+    let body;
 
-      if (!body.success || !body.data || !Object.keys(body.data).length) {
-        logger.debug(
-          `[Travelpayouts] No data returned for ${origin}→${destination} ${departMonth}`,
-        );
-        return null;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const response = await axios.get(`${BASE_URL}/calendar`, {
+          params: query,
+          headers: {
+            "x-access-token": env.TRAVELPAYOUTS_API_TOKEN,
+            "Accept-Encoding": "gzip, deflate",
+          },
+          timeout: 10_000,
+        });
+        body = response.data;
+        break;
+      } catch (err) {
+        if (err.response?.status === 429) {
+          if (attempt < MAX_ATTEMPTS) {
+            const delay = RETRY_DELAYS_MS[attempt - 1];
+            logger.warn(
+              `[Travelpayouts] Rate limit hit — retrying in ${delay / 1000}s (attempt ${attempt}/${MAX_ATTEMPTS})`,
+            );
+            await _sleep(delay);
+            continue;
+          }
+          logger.warn("[Travelpayouts] Rate limit hit — all retries exhausted");
+          throw new Error("Travelpayouts rate limit exceeded");
+        }
+        if (err.response?.status === 403) {
+          throw new Error("Travelpayouts token invalid or unauthorised");
+        }
+        logger.error(`[Travelpayouts] API error: ${err.message}`);
+        throw err;
       }
-
-      // Pick the date with the lowest price across the whole month
-      const best = _pickLowest(body.data);
-      if (!best) return null;
-
-      // Reject stale prices (expired_at in the past)
-      if (best.expires_at && new Date(best.expires_at) < new Date()) {
-        logger.debug(
-          `[Travelpayouts] Price expired for ${origin}→${destination}`,
-        );
-        return null;
-      }
-
-      return {
-        price: best.price,
-        currency: currency.toUpperCase(),
-        origin,
-        destination,
-        departureDate: best.departure_at?.slice(0, 10) ?? departureDateFrom,
-        returnDate: best.return_at?.slice(0, 10) ?? null,
-        airline: best.airline ?? null,
-        transfers: best.transfers ?? null,
-        provider: "travelpayouts",
-        bookingLink: bookingLink(
-          origin,
-          destination,
-          best.departure_at?.slice(0, 10),
-          currency,
-        ),
-        fetchedAt: new Date(),
-        expiresAt: best.expires_at ? new Date(best.expires_at) : null,
-      };
-    } catch (err) {
-      if (err.response?.status === 429) {
-        logger.warn("[Travelpayouts] Rate limit hit — backing off");
-        throw new Error("Travelpayouts rate limit exceeded");
-      }
-      if (err.response?.status === 403) {
-        throw new Error("Travelpayouts token invalid or unauthorised");
-      }
-      logger.error(`[Travelpayouts] API error: ${err.message}`);
-      throw err;
     }
+
+    if (!body?.success || !body?.data || !Object.keys(body.data).length) {
+      logger.debug(`[Travelpayouts] No data returned for ${origin}→${destination} ${departMonth}`);
+      return null;
+    }
+
+    // ── Collect prices in user's window + enumerate all days ──────────────
+    const { best, allDayPrices } = _collectInRange(body.data, departureDateFrom, departureDateTo);
+
+    if (!best) {
+      logger.debug(
+        `[Travelpayouts] No fares in window ${departureDateFrom} → ${departureDateTo ?? departureDateFrom} ` +
+        `for ${origin}→${destination}`,
+      );
+      return null;
+    }
+
+    // Reject stale prices
+    if (best.expires_at && new Date(best.expires_at) < new Date()) {
+      logger.debug(`[Travelpayouts] Price expired for ${origin}→${destination}`);
+      return null;
+    }
+
+    const bestDate = best.departure_at?.slice(0, 10) ?? departureDateFrom;
+
+    return {
+      price: best.price,
+      currency: currency.toUpperCase(),
+      origin,
+      destination,
+      departureDate: bestDate,              // cheapest day in window
+      departureDateFrom,                    // user window start
+      departureDateTo: departureDateTo ?? null,
+      returnDate: best.return_at?.slice(0, 10) ?? null,
+      airline: best.airline ?? null,
+      transfers: best.transfers ?? null,
+      cabinClass,
+      allDayPrices,                         // [{date, price, airline, transfers}] for report
+      provider: "travelpayouts",
+      bookingLink: bookingLink(origin, destination, bestDate, currency),
+      fetchedAt: new Date(),
+      expiresAt: best.expires_at ? new Date(best.expires_at) : null,
+    };
   },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 /**
- * Pick the entry with the lowest price from the calendar response object.
- * { "2025-10-01": { price, airline, ... }, "2025-10-02": { ... } }
+ * Collect all prices within [fromStr, toStr] from the API response,
+ * enumerate every calendar day in the range (including "no data" days),
+ * and return both the cheapest entry and the full sorted list.
  */
-const _pickLowest = (data) => {
+const _collectInRange = (data, fromStr, toStr) => {
+  const from = fromStr ? new Date(fromStr) : null;
+  const to   = toStr   ? new Date(toStr)   : from;
+
+  // Build a map of date → entry for dates within range
+  const dataMap = {};
   let best = null;
-  for (const entry of Object.values(data)) {
+
+  for (const [dateKey, entry] of Object.entries(data)) {
     if (!entry.price) continue;
-    if (!best || entry.price < best.price) best = entry;
+    const d = new Date(dateKey);
+    if (from && to && (d < from || d > to)) continue;
+
+    dataMap[dateKey] = entry;
+    if (!best || entry.price < best.price) {
+      best = { ...entry, _dateKey: dateKey };
+    }
   }
-  return best;
+
+  // Enumerate all days in range (including no-data days)
+  const allDayPrices = [];
+  if (from && to) {
+    const cursor = new Date(from);
+    while (cursor <= to) {
+      const dateKey = cursor.toISOString().slice(0, 10);
+      const entry = dataMap[dateKey];
+      allDayPrices.push(
+        entry
+          ? { date: dateKey, price: entry.price, airline: entry.airline ?? null, transfers: entry.transfers ?? null }
+          : { date: dateKey, price: null },
+      );
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  } else if (best) {
+    allDayPrices.push({ date: best._dateKey, price: best.price, airline: best.airline ?? null, transfers: best.transfers ?? null });
+  }
+
+  logger.debug(
+    `[Travelpayouts] ${allDayPrices.filter(d => d.price).length}/${allDayPrices.length} days have data — best: ${best?.price ?? "none"}`,
+  );
+
+  return { best, allDayPrices };
 };
 
-/**
- * Convert any date string (yyyy-mm-dd or yyyy-mm) to yyyy-mm.
- * Returns null if unparseable.
- */
 const _toYYYYMM = (dateStr) => {
   if (!dateStr) return null;
   const m = String(dateStr).match(/^(\d{4}-\d{2})/);
   return m ? m[1] : null;
 };
+
+const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export default TravelpayoutsProvider;

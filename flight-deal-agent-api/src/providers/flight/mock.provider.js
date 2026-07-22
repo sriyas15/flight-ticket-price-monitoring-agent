@@ -13,27 +13,20 @@ const BASE_FARES = {
 /**
  * Mock Flight Provider
  *
- * Simulates realistic price fluctuations so the rest of the system
- * (baseline calc, deal detection, notifications) can be tested end-to-end
- * without a real API key.
- *
- * Occasionally produces a "deal" price (30–40% below base) to exercise
- * the full alert pipeline.
+ * Simulates realistic price fluctuations for the full date window so the
+ * daily price report renders with real-looking day-by-day data.
  */
 const MockFlightProvider = {
   name: "mock",
 
-  /**
-   * @param {Object} params - See provider.interface.js
-   * @returns {Promise<import('./provider.interface.js').FlightResult | null>}
-   */
   fetchLowestFare: async (params) => {
     const {
       origin,
       destination,
       departureDateFrom,
-      cabinClass,
-      passengers,
+      departureDateTo,
+      cabinClass = "economy",
+      passengers = 1,
       currency = "INR",
     } = params;
 
@@ -43,7 +36,6 @@ const MockFlightProvider = {
     const key = `${origin}-${destination}`;
     const base = BASE_FARES[key] ?? BASE_FARES.DEFAULT;
 
-    // Cabin class multipliers
     const cabinMultiplier = {
       economy: 1,
       premium_economy: 1.6,
@@ -51,25 +43,60 @@ const MockFlightProvider = {
       first: 5.5,
     }[cabinClass] ?? 1;
 
-    // 10% chance of a deal (price 30–40% below base)
-    const isDeal = Math.random() < 0.1;
-    const variance = isDeal
-      ? -(0.30 + Math.random() * 0.10)      // −30% to −40%
-      : (Math.random() * 0.20 - 0.05);      // −5% to +15% normal drift
+    // ── Generate price for every day in the window ────────────────────────
+    const from = departureDateFrom ? new Date(departureDateFrom) : null;
+    const to   = departureDateTo   ? new Date(departureDateTo)   : from;
 
-    const price = Math.round(base * cabinMultiplier * passengers * (1 + variance));
+    if (!from) return null;
 
-    if (isDeal) {
-      logger.debug(`[MockProvider] Deal price generated for ${key}: ${currency} ${price}`);
+    const allDayPrices = [];
+    let best = null;
+
+    const cursor = new Date(from);
+    while (cursor <= to) {
+      const dateKey = cursor.toISOString().slice(0, 10);
+
+      // ~5% chance of no data for a day (simulates no available flights)
+      if (Math.random() < 0.05) {
+        allDayPrices.push({ date: dateKey, price: null });
+        cursor.setDate(cursor.getDate() + 1);
+        continue;
+      }
+
+      // 10% chance of a deal day (30–40% below base)
+      const isDeal   = Math.random() < 0.1;
+      const variance = isDeal
+        ? -(0.30 + Math.random() * 0.10)
+        : (Math.random() * 0.20 - 0.05);
+
+      const dayPrice = Math.round(base * cabinMultiplier * passengers * (1 + variance));
+
+      allDayPrices.push({ date: dateKey, price: dayPrice, airline: null, transfers: 0 });
+
+      if (!best || dayPrice < best.price) {
+        best = { date: dateKey, price: dayPrice };
+      }
+
+      if (isDeal) {
+        logger.debug(`[MockProvider] Deal price on ${dateKey} for ${key}: ${currency} ${dayPrice}`);
+      }
+
+      cursor.setDate(cursor.getDate() + 1);
     }
 
+    if (!best) return null;
+
     return {
-      price,
+      price: best.price,
       currency,
       origin,
       destination,
-      departureDate: departureDateFrom,
+      departureDate: best.date,
+      departureDateFrom,
+      departureDateTo: departureDateTo ?? null,
       returnDate: params.returnDateFrom ?? null,
+      cabinClass,
+      allDayPrices,
       provider: "mock",
       bookingLink: `https://www.google.com/flights?q=${origin}+to+${destination}`,
       fetchedAt: new Date(),

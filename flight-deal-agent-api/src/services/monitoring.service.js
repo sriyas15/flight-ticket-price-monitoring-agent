@@ -1,4 +1,4 @@
-import getFlightProvider from "../providers/flight/provider.js";
+import { getPrimaryProvider, getFallbackProvider } from "../providers/flight/provider.js";
 import ComparisonService from "./comparison.service.js";
 import NotificationService from "./notification.service.js";
 import AlertRepository from "../modules/alerts/alert.repository.js";
@@ -10,19 +10,21 @@ import logger from "../config/logger.js";
 const MonitoringService = {
   /**
    * Process one route through the full monitoring pipeline:
-   *   fetch → observe → compare → (optionally) alert
+   *   fetch → observe → compare → send daily price report
    *
-   * Called by the BullMQ worker for each route job.
+   * A report is always sent once per 24h regardless of whether the target
+   * price was hit. The report includes day-by-day prices for the user's window.
    *
    * @param {Object} route      - FlightRoute document
    * @param {string} agentRunId - Parent run ID for log correlation
    * @returns {Promise<{ dealt: boolean, price: number|null }>}
    */
   processRoute: async (route, agentRunId) => {
-    const provider = getFlightProvider();
+    const primaryProvider  = getPrimaryProvider();
+    const fallbackProvider = getFallbackProvider();
 
-    // 1. Fetch current lowest fare from provider
-    const result = await provider.fetchLowestFare({
+    // Build provider params once — reused for primary + optional fallback
+    const providerParams = {
       origin: route.origin,
       destination: route.destination,
       departureDateFrom: route.departureDateFrom?.toISOString().split("T")[0],
@@ -33,7 +35,17 @@ const MonitoringService = {
       cabinClass: route.cabinClass,
       passengers: route.passengers,
       currency: route.currency,
-    });
+    };
+
+    // 1. Fetch from primary provider; fall back if it returns null
+    let result = await primaryProvider.fetchLowestFare(providerParams);
+
+    if (!result && fallbackProvider) {
+      logger.warn(
+        `[MonitoringService] Primary provider returned null for route ${route._id} — trying fallback (${fallbackProvider.name})`
+      );
+      result = await fallbackProvider.fetchLowestFare(providerParams);
+    }
 
     if (!result) {
       logger.debug(`No fares found for route ${route._id} (${route.origin}→${route.destination})`);
@@ -41,7 +53,7 @@ const MonitoringService = {
       return { dealt: false, price: null };
     }
 
-    // 2. Persist price observation (for history + baseline)
+    // 2. Persist price observation (best price only — for baseline history)
     await AlertRepository.saveObservation({
       routeId: route._id,
       price: result.price,
@@ -58,7 +70,7 @@ const MonitoringService = {
     // 4. Update route with latest checked timestamp + new baseline
     await FlightRouteRepository.updateLastChecked(route._id, baseline);
 
-    // 5. Evaluate deal criteria
+    // 5. Evaluate deal criteria (informational — used in report label, not to gate sending)
     const { isDeal, dropPct } = ComparisonService.isDeal({
       currentPrice: result.price,
       targetPrice: route.targetPrice,
@@ -66,43 +78,35 @@ const MonitoringService = {
       thresholdPct: route.alertThresholdPct,
     });
 
-    if (!isDeal) {
-      logger.debug(
-        `No deal for route ${route._id}: price=${result.price}, baseline=${baseline}`
-      );
-      return { dealt: false, price: result.price };
-    }
+    logger.debug(
+      `Route ${route._id} (${route.origin}→${route.destination}): price=${result.price}, baseline=${baseline}, isDeal=${isDeal}`
+    );
 
-    // 6. Cooldown check — avoid spam (FR-16)
+    // 6. Cooldown check — one report per 24h per route
     const recentAlert = await AlertRepository.findRecentAlert(
       route._id,
       ALERT_COOLDOWN_HOURS
     );
 
     if (recentAlert) {
-      // Only re-alert if price dropped further than last alert
-      const priceDroppedFurther = result.price < recentAlert.priceAtAlert;
-      if (!priceDroppedFurther) {
-        logger.debug(
-          `Cooldown active for route ${route._id} — skipping alert`
-        );
-        return { dealt: true, price: result.price };
-      }
+      logger.debug(`Cooldown active for route ${route._id} — skipping report`);
+      return { dealt: isDeal, price: result.price };
     }
 
     // 7. Load user for their notification channel
     const user = await UserRepository.findById(route.userId.toString());
     if (!user) {
-      logger.warn(`User not found for route ${route._id} — skipping alert`);
-      return { dealt: true, price: result.price };
+      logger.warn(`User not found for route ${route._id} — skipping report`);
+      return { dealt: isDeal, price: result.price };
     }
 
-    // 8. Send alert
+    // 8. Send daily price report (always — target hit is just a label in the message)
     const sent = await NotificationService.sendDealAlert({
       user,
       route,
       result,
       dropPct,
+      isDeal,
       agentRunId,
     });
 
@@ -110,7 +114,7 @@ const MonitoringService = {
       await FlightRouteRepository.updateLastAlertSent(route._id);
     }
 
-    return { dealt: true, price: result.price };
+    return { dealt: isDeal, price: result.price };
   },
 };
 

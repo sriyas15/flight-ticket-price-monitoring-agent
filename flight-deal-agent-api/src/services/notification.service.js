@@ -19,7 +19,7 @@ const NotificationService = {
    * @param {string} params.agentRunId
    * @returns {Promise<boolean>} true if delivered successfully
    */
-  sendDealAlert: async ({ user, route, result, dropPct, agentRunId }) => {
+  sendDealAlert: async ({ user, route, result, dropPct, isDeal = false, agentRunId }) => {
     // Determine channel
     const channel = _resolveChannel(user);
     if (!channel) {
@@ -54,7 +54,7 @@ const NotificationService = {
           );
         }
 
-        await _deliver(channel, user, route, result, dropPct);
+        await _deliver(channel, user, route, result, dropPct, isDeal);
 
         // Mark as sent
         await AlertRepository.updateAlertStatus(alertLog._id, DEAL_STATUS.SENT);
@@ -89,14 +89,15 @@ const _resolveChannel = (user) => {
   return null;
 };
 
-const _deliver = async (channel, user, route, result, dropPct) => {
+const _deliver = async (channel, user, route, result, dropPct, isDeal) => {
   switch (channel) {
     case ALERT_CHANNEL.TELEGRAM:
       await TelegramProvider.sendDealAlert(
         user.telegramChatId,
         route,
         result,
-        dropPct
+        dropPct,
+        isDeal
       );
       break;
 
