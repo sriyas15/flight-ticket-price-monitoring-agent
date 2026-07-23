@@ -167,8 +167,8 @@ const TravelpayoutsProvider = {
     const departMonth = _toYYYYMM(departureDateFrom);
 
     try {
-      // ── Try the /v2/prices/cheap endpoint first ───────────────────────
-      const response = await axios.get("https://api.travelpayouts.com/v2/prices/cheap", {
+      // ── Try the /v1/prices/cheap endpoint first ───────────────────────
+      const response = await axios.get("https://api.travelpayouts.com/v1/prices/cheap", {
         params: {
           origin,
           depart_date: departMonth,
@@ -205,7 +205,7 @@ const TravelpayoutsProvider = {
         }
       }
     } catch (err) {
-      logger.warn(`[Travelpayouts] /v2/prices/cheap failed for ${origin}: ${err.message} — falling back to fan-out`);
+      logger.warn(`[Travelpayouts] /v1/prices/cheap failed for ${origin}: ${err.message} — falling back to fan-out`);
     }
 
     // ── Fallback: fan out via fetchLowestFare ──────────────────────────
