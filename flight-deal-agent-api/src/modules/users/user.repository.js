@@ -20,6 +20,9 @@ const UserRepository = {
   findByGoogleId: (googleId) =>
     User.findOne({ googleId }).exec(),
 
+  findByTelegramChatId: (chatId) =>
+    User.findOne({ telegramChatId: chatId }).exec(),
+
   create: (data) =>
     User.create(data),
 

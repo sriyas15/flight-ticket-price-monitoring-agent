@@ -47,6 +47,14 @@ router.patch("/me/telegram",
   async (req, res, next) => {
     try {
       const { telegramChatId } = req.body;
+
+      // 1. Check if the chat ID is already linked to another account
+      const existingUser = await UserRepository.findByTelegramChatId(telegramChatId);
+      if (existingUser && existingUser._id.toString() !== req.user.sub) {
+        throw ApiError.conflict("This Telegram account is already connected to another user.");
+      }
+
+      // 2. Verify with Telegram provider
       const TelegramProvider = (await import("../../providers/notification/telegram.provider.js")).default;
       try {
         await TelegramProvider.sendVerification(telegramChatId);
@@ -55,6 +63,8 @@ router.patch("/me/telegram",
           "Could not reach that Telegram chat. Make sure you have started a conversation with the bot first, then retry."
         );
       }
+
+      // 3. Update user profile
       const user = await UserRepository.updateById(req.user.sub, { telegramChatId });
       return sendSuccess(res, 200, "Telegram connected and verified", { user: user.toPublicProfile() });
     } catch (err) { next(err); }
