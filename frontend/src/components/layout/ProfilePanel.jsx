@@ -259,7 +259,7 @@ function TelegramTab({ user, loading, onConnect, onDisconnect }) {
             onClick={handleDisconnect}
             disabled={saving}
             className="w-full py-2.5 rounded-lg text-sm font-semibold transition-colors"
-            style={{ background: "rgba(226,96,79,0.07)", border: "1.5px solid rgba(226,96,79,0.2)", color: "#C04030", cursor: "pointer" }}
+            style={{ background: "rgba(226,96,79,0.07)", border: "1.5px solid rgba(226,96,79,0.2)", color: "#C04030", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}
           >
             {saving ? "Disconnecting…" : "Disconnect Telegram"}
           </button>
@@ -269,9 +269,9 @@ function TelegramTab({ user, loading, onConnect, onDisconnect }) {
         <form onSubmit={handleConnect} className="flex flex-col gap-3">
           <Field label="Your Telegram Chat ID" id="tchatid">
             <Input id="tchatid" placeholder="e.g. 123456789" value={chatId}
-              onChange={(e) => setChatId(e.target.value)} required />
+              onChange={(e) => setChatId(e.target.value)} required style={{ padding: "12px 16px", fontSize: "15px" }} />
           </Field>
-          <PrimaryBtn type="submit" loading={saving}>
+          <PrimaryBtn type="submit" loading={saving} disabled={!chatId.trim()}>
             Connect Telegram
           </PrimaryBtn>
         </form>

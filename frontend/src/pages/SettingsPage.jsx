@@ -5,7 +5,7 @@ import { Field, Input, PrimaryBtn, ErrorBanner } from "../components/ui/index.js
 export default function SettingsPage() {
   const {
     user, error, success, clearMessages,
-    updateProfile, connectTelegram, disconnectTelegram,
+    updateProfile,
     changePassword, deleteAccount,
   } = useUser();
 
@@ -30,7 +30,7 @@ export default function SettingsPage() {
 
       <div className="flex flex-col gap-5">
         <ProfileSection   user={user} onSave={async (p) => { clearMessages(); await updateProfile(p); }} />
-        <TelegramSection  user={user} onConnect={async (id) => { clearMessages(); await connectTelegram(id); }} onDisconnect={async () => { clearMessages(); await disconnectTelegram(); }} />
+        <TelegramSection  user={user} />
         {/* Password section only shown for local (email/password) accounts */}
         {user?.authProvider !== "google" && (
           <PasswordSection onSave={async (p) => { clearMessages(); await changePassword(p); }} />
@@ -97,27 +97,11 @@ function ProfileSection({ user, onSave }) {
 }
 
 // ── 02 Telegram ────────────────────────────────────────────────────────────
-function TelegramSection({ user, onConnect, onDisconnect }) {
-  const [chatId, setChatId] = useState("");
-  const [saving, setSaving] = useState(false);
+function TelegramSection({ user }) {
   const isConnected = !!user?.telegramChatId;
 
-  const handleConnect = async (e) => {
-    e.preventDefault();
-    if (!chatId.trim()) return;
-    setSaving(true);
-    try { await onConnect(chatId.trim()); setChatId(""); }
-    finally { setSaving(false); }
-  };
-
-  const handleDisconnect = async () => {
-    if (!window.confirm("Disconnect Telegram? You won't receive alerts until you reconnect.")) return;
-    setSaving(true);
-    try { await onDisconnect(); } finally { setSaving(false); }
-  };
-
   return (
-    <SectionCard eyebrow="02 — Notifications" title="Telegram" sub="Connect your Telegram account to receive deal alerts.">
+    <SectionCard eyebrow="02 — Notifications" title="Telegram" sub="Manage your Telegram connection in your profile.">
       <div className="flex flex-col gap-4">
         {/* Status badge */}
         <div className="flex items-center gap-3 rounded-lg px-4 py-3"
@@ -133,59 +117,11 @@ function TelegramSection({ user, onConnect, onDisconnect }) {
               {isConnected ? "Telegram connected" : "Not connected"}
             </div>
             <div className="text-xs" style={{ color: "#8FA3B1" }}>
-              {isConnected ? `Chat ID: ${user.telegramChatId}` : "Deal alerts will be sent to your Telegram."}
+              {isConnected ? `Chat ID: ${user.telegramChatId}` : "Deal alerts will be sent to your Telegram once connected."}
             </div>
           </div>
           <span className="w-2 h-2 rounded-full ml-auto" style={{ background: isConnected ? "#4FAE84" : "#E5E0D8" }} />
         </div>
-
-        {!isConnected && (
-          <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: "#F7F5F1", border: "1px solid #EAE6E0" }}>
-            <p className="text-xs font-semibold" style={{ color: "#0E1F33" }}>How to connect</p>
-            <div className="flex items-start gap-2.5">
-              <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                style={{ background: "#F2A93B", color: "#23150A", fontFamily: "'Space Mono', monospace" }}>1</span>
-              <span className="text-xs leading-relaxed" style={{ color: "#5C7589" }}>
-                Open Telegram and start a chat with{" "}
-                <a href="https://t.me/FlightTicketAgentBot" target="_blank" rel="noreferrer"
-                  style={{ color: "#2B7BE9", fontWeight: 600 }}>@FlightTicketAgentBot</a>
-                {" "}— send <code style={{ background: "#EAE6E0", borderRadius: 3, padding: "0 3px", fontSize: 11 }}>/start</code> to activate the bot
-              </span>
-            </div>
-            <div className="flex items-start gap-2.5">
-              <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                style={{ background: "#F2A93B", color: "#23150A", fontFamily: "'Space Mono', monospace" }}>2</span>
-              <span className="text-xs leading-relaxed" style={{ color: "#5C7589" }}>
-                Then search for{" "}
-                <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer"
-                  style={{ color: "#2B7BE9", fontWeight: 600 }}>@userinfobot</a>
-                {" "}— send <code style={{ background: "#EAE6E0", borderRadius: 3, padding: "0 3px", fontSize: 11 }}>/start</code> and it replies with your numeric Chat ID
-              </span>
-            </div>
-            <div className="flex items-start gap-2.5">
-              <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                style={{ background: "#F2A93B", color: "#23150A", fontFamily: "'Space Mono', monospace" }}>3</span>
-              <span className="text-xs leading-relaxed" style={{ color: "#5C7589" }}>
-                Paste that numeric ID below — we'll send a verification message to confirm
-              </span>
-            </div>
-          </div>
-        )}
-
-        {isConnected ? (
-          <button onClick={handleDisconnect} disabled={saving}
-            className="w-full py-2.5 rounded-lg text-sm font-semibold"
-            style={{ background: "rgba(226,96,79,0.06)", border: "1.5px solid rgba(226,96,79,0.2)", color: "#C04030", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
-            {saving ? "Disconnecting…" : "Disconnect Telegram"}
-          </button>
-        ) : (
-          <form onSubmit={handleConnect} className="flex gap-3">
-            <div className="flex-1">
-              <Input placeholder="e.g. 123456789" value={chatId} onChange={(e) => setChatId(e.target.value)} required />
-            </div>
-            <PrimaryBtn type="submit" loading={saving} className="w-auto px-5 flex-shrink-0">Connect</PrimaryBtn>
-          </form>
-        )}
       </div>
     </SectionCard>
   );

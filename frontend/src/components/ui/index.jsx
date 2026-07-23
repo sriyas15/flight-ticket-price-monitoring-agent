@@ -53,7 +53,7 @@ export const Select = ({ children, className = "", ...props }) => (
 );
 
 // ── Button variants ───────────────────────────────────────────────────────
-export const PrimaryBtn = ({ children, loading, className = "", ...props }) => (
+export const PrimaryBtn = ({ children, loading, disabled, className = "", ...props }) => (
   <button
     className={`w-full rounded-lg py-3 text-sm font-bold transition-opacity ${className}`}
     style={{
@@ -61,10 +61,10 @@ export const PrimaryBtn = ({ children, loading, className = "", ...props }) => (
       color: "#23150A",
       border: "none",
       fontFamily: "'Work Sans', sans-serif",
-      opacity: loading ? 0.7 : 1,
-      cursor: loading ? "not-allowed" : "pointer",
+      opacity: loading || disabled ? 0.6 : 1,
+      cursor: loading || disabled ? "not-allowed" : "pointer",
     }}
-    disabled={loading}
+    disabled={loading || disabled}
     {...props}
   >
     {loading ? "Please wait…" : children}
