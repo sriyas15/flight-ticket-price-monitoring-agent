@@ -79,6 +79,67 @@ router.delete("/me/telegram", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── POST /users/me/test-alert — send a mock Telegram alert ───────────────
+router.post("/me/test-alert", async (req, res, next) => {
+  try {
+    const user = await UserRepository.findById(req.user.sub);
+    if (!user) throw ApiError.notFound("User not found");
+
+    if (!user.telegramChatId) {
+      throw ApiError.badRequest(
+        "No Telegram account connected. Go to Settings → Notifications to connect your Telegram first."
+      );
+    }
+
+    const TelegramProvider = (await import("../../providers/notification/telegram.provider.js")).default;
+
+    // Build a realistic mock route + result so the preview matches the real format
+    const mockRoute = {
+      _id: "test",
+      origin: "BOM",
+      destination: "DXB",
+      cabinClass: "economy",
+      passengers: 1,
+      currency: "INR",
+      targetPrice: 9000,
+      baselinePrice: 11500,
+      alertThresholdPct: 15,
+    };
+
+    const today = new Date();
+    const depDate = new Date(today);
+    depDate.setDate(depDate.getDate() + 30); // 30 days from now
+    const depDateStr = depDate.toISOString().slice(0, 10);
+
+    const mockResult = {
+      price: 8499,
+      currency: "INR",
+      origin: "BOM",
+      destination: "DXB",
+      departureDate: depDateStr,
+      airline: "EK",
+      transfers: 0,
+      cabinClass: "economy",
+      provider: "test",
+      bookingLink: "https://www.aviasales.com",
+      fetchedAt: new Date(),
+    };
+
+    const mockDropPct = 26.1; // 8499 vs 11500 baseline
+    const mockIsDeal  = true;  // target 9000 is hit
+
+    await TelegramProvider.sendDealAlert(
+      user.telegramChatId,
+      mockRoute,
+      mockResult,
+      mockDropPct,
+      mockIsDeal
+    );
+
+    return sendSuccess(res, 200, "Test alert sent to your Telegram successfully.");
+  } catch (err) { next(err); }
+});
+
 // ── PATCH /users/me/password — change password ────────────────────────────
 router.patch("/me/password",
   [

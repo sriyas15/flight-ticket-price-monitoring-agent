@@ -48,49 +48,25 @@ const _price = (amount, currency) =>
  * @param {boolean} isDeal - true if target price or % threshold was met
  */
 const formatPriceReport = (route, result, dropPct, isDeal) => {
-  const currency   = result.currency ?? route.currency ?? "INR";
-  const cabin      = (result.cabinClass ?? route.cabinClass ?? "economy")
+  const currency = result.currency ?? route.currency ?? "INR";
+  const cabin    = (result.cabinClass ?? route.cabinClass ?? "economy")
     .replace("_", " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
-  const pax        = route.passengers ?? 1;
-  const paxLabel   = pax === 1 ? "1 Adult" : `${pax} Adults`;
+  const pax      = route.passengers ?? 1;
+  const paxLabel = pax === 1 ? "1 Adult" : `${pax} Adults`;
 
   // ── Header ───────────────────────────────────────────────────────────────
   const header =
     `📊 *Daily Price Report*\n\n` +
     `🛫 *${esc(route.origin)} → ${esc(route.destination)}*  ·  ${esc(cabin)}  ·  ${esc(paxLabel)}\n`;
 
-  // ── Date window label ─────────────────────────────────────────────────────
-  const windowStart = result.departureDateFrom ?? result.departureDate;
-  const windowEnd   = result.departureDateTo;
-  const windowLine  = windowEnd && windowEnd !== windowStart
-    ? `📅 ${esc(_fmtFull(windowStart))} – ${esc(_fmtFull(windowEnd))}\n\n`
-    : `📅 ${esc(_fmtFull(windowStart))}\n\n`;
+  // ── Cheapest date line ────────────────────────────────────────────────────
+  const dateLine = result.departureDate
+    ? `📅 ${esc(_fmtFull(result.departureDate))}\n\n`
+    : "\n";
 
-  // ── Day-by-day price table ────────────────────────────────────────────────
-  const allDayPrices = result.allDayPrices ?? [];
-  let priceTable = "";
-
-  if (allDayPrices.length > 0) {
-    const rows = allDayPrices.map((day) => {
-      const label  = esc(_fmtDay(day.date));
-      const isBest = day.date === result.departureDate && day.price != null;
-      if (day.price == null) {
-        return `📆 ${label}  —`;
-      }
-      const priceStr = esc(_price(day.price, currency));
-      return isBest
-        ? `📆 ${label}  *${priceStr}*  ⭐`
-        : `📆 ${label}  ${priceStr}`;
-    });
-    priceTable = rows.join("\n") + "\n\n";
-  }
-
-  // ── Summary line ──────────────────────────────────────────────────────────
-  const bestLine =
-    `💰 Best: *${esc(_price(result.price, currency))}*` +
-    (result.departureDate ? `  on ${esc(_fmtDay(result.departureDate))}` : "") +
-    "\n";
+  // ── Cheapest price (the only price shown) ────────────────────────────────
+  const bestLine = `💰 Cheapest Price: *${esc(_price(result.price, currency))}*\n`;
 
   // ── Target status ─────────────────────────────────────────────────────────
   let targetLine = "";
@@ -103,7 +79,7 @@ const formatPriceReport = (route, result, dropPct, isDeal) => {
 
   // ── Baseline drop % ───────────────────────────────────────────────────────
   const dropLine = dropPct != null && dropPct > 0
-    ? `📉 ${esc(dropPct.toFixed(1))}% below your ${esc("14")}-day average\n`
+    ? `📉 ${esc(dropPct.toFixed(1))}% below your 14\\-day average\n`
     : "";
 
   // ── Airline / stops ───────────────────────────────────────────────────────
@@ -115,12 +91,11 @@ const formatPriceReport = (route, result, dropPct, isDeal) => {
     : "";
 
   // ── Book link ─────────────────────────────────────────────────────────────
-  const bookLink = `\n[Book cheapest day ↗](${result.bookingLink})`;
+  const bookLink = `\n[Book now ↗](${result.bookingLink})`;
 
   return (
     header +
-    windowLine +
-    priceTable +
+    dateLine +
     bestLine +
     targetLine +
     dropLine +
