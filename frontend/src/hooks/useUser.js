@@ -76,6 +76,31 @@ export const useUser = () => {
     // Don't setLoading(false) on success — page will unmount via logout redirect
   }, [logout]);
 
+  const updateNotifyHour = useCallback(async (notifyHour) => {
+    clearMessages();
+    setLoading(true);
+    try {
+      const { data } = await api.patch("/users/me/notify-hour", { notifyHour });
+      setSuccess("Notification time saved.");
+      return data.data.user;
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to save notification time.");
+      throw err;
+    } finally { setLoading(false); }
+  }, []);
+
+  const sendTestAlert = useCallback(async () => {
+    clearMessages();
+    setLoading(true);
+    try {
+      await api.post("/users/me/test-alert");
+      setSuccess("Test alert sent! Check your Telegram.");
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to send test alert.");
+      throw err;
+    } finally { setLoading(false); }
+  }, []);
+
   return {
     user,
     loading,
@@ -87,5 +112,7 @@ export const useUser = () => {
     disconnectTelegram,
     changePassword,
     deleteAccount,
+    updateNotifyHour,
+    sendTestAlert,
   };
 };

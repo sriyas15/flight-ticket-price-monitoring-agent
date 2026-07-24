@@ -7,6 +7,7 @@ export default function SettingsPage() {
     user, error, success, clearMessages,
     updateProfile,
     changePassword, deleteAccount,
+    updateNotifyHour,
   } = useUser();
 
   return (
@@ -30,7 +31,7 @@ export default function SettingsPage() {
 
       <div className="flex flex-col gap-5">
         <ProfileSection   user={user} onSave={async (p) => { clearMessages(); await updateProfile(p); }} />
-        <TelegramSection  user={user} />
+        <TelegramSection  user={user} onSaveHour={async (h) => { clearMessages(); await updateNotifyHour(h); }} />
         {/* Password section only shown for local (email/password) accounts */}
         {user?.authProvider !== "google" && (
           <PasswordSection onSave={async (p) => { clearMessages(); await changePassword(p); }} />
@@ -97,11 +98,59 @@ function ProfileSection({ user, onSave }) {
 }
 
 // ── 02 Telegram ────────────────────────────────────────────────────────────
-function TelegramSection({ user }) {
+
+/** IST is UTC+5:30. Convert an IST hour (0-23) to the UTC hour stored on the server. */
+const istToUtcHour = (istHour) => Math.floor(((istHour * 60 - 330) + 1440) % 1440 / 60);
+
+/** Convert a stored UTC hour back to the nearest IST hour for display. */
+const utcToIstHour = (utcHour) => Math.round(((utcHour * 60 + 330)) % 1440 / 60) % 24;
+
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => {
+  const label = h === 0 ? "12:00 AM" : h < 12 ? `${h}:00 AM` : h === 12 ? "12:00 PM" : `${h - 12}:00 PM`;
+  return { value: h, label };
+});
+
+function TelegramSection({ user, onSaveHour }) {
   const isConnected = !!user?.telegramChatId;
 
+  // savedIstHour is the source of truth for what's been persisted.
+  // We own it as state so we can update it after a successful save
+  // without waiting for the AuthContext user to refresh.
+  const [savedIstHour, setSavedIstHour] = useState(() => utcToIstHour(user?.notifyHour ?? 6));
+  const [istHour,      setIstHour]      = useState(() => utcToIstHour(user?.notifyHour ?? 6));
+  const [saving,       setSaving]       = useState(false);
+  const [savedMsg,     setSavedMsg]     = useState(false); // local success flash
+
+  // Sync from context on first load (covers page refresh / initial mount)
+  useEffect(() => {
+    const h = utcToIstHour(user?.notifyHour ?? 6);
+    setSavedIstHour(h);
+    setIstHour(h);
+  }, [user?.notifyHour]);
+
+  const previewUtc   = istToUtcHour(istHour);
+  const previewLabel = HOUR_OPTIONS[istHour]?.label ?? "";
+  const utcLabel     = `${String(previewUtc).padStart(2, "0")}:00 UTC`;
+  const isModified   = istHour !== savedIstHour;
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!isModified) return;
+    setSaving(true);
+    try {
+      await onSaveHour(istToUtcHour(istHour));
+      // Update our local baseline — button disables immediately
+      setSavedIstHour(istHour);
+      // Show inline success message, auto-dismiss after 3 s
+      setSavedMsg(true);
+      setTimeout(() => setSavedMsg(false), 3000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <SectionCard eyebrow="02 — Notifications" title="Telegram" sub="Manage your Telegram connection in your profile.">
+    <SectionCard eyebrow="02 — Notifications" title="Telegram" sub="Manage your Telegram connection and alert schedule.">
       <div className="flex flex-col gap-4">
         {/* Status badge */}
         <div className="flex items-center gap-3 rounded-lg px-4 py-3"
@@ -122,10 +171,109 @@ function TelegramSection({ user }) {
           </div>
           <span className="w-2 h-2 rounded-full ml-auto" style={{ background: isConnected ? "#4FAE84" : "#E5E0D8" }} />
         </div>
+
+        {/* Alert time — only shown when connected */}
+        {isConnected && (
+          <>
+            <div style={{ borderTop: "1px solid #EAE6E0", marginTop: 2 }} />
+
+            {/* Label */}
+            <div>
+              <p className="text-sm font-semibold" style={{ color: "#0E1F33", marginBottom: 2 }}>Daily alert time</p>
+              <p className="text-xs" style={{ color: "#8FA3B1" }}>Choose when you want to receive your daily Telegram price report. Times are in India Standard Time (IST).</p>
+            </div>
+
+            {/* Picker row */}
+            <form onSubmit={handleSave}>
+              <div className="flex items-center gap-3">
+                {/* Hour select */}
+                <div className="relative" style={{ flex: "0 0 160px" }}>
+                  <select
+                    id="notify-hour-select"
+                    value={istHour}
+                    onChange={(e) => setIstHour(Number(e.target.value))}
+                    style={{
+                      width: "100%",
+                      padding: "10px 36px 10px 14px",
+                      border: "1.5px solid #D9D3CC",
+                      borderRadius: 10,
+                      fontSize: 14,
+                      fontFamily: "'Work Sans', sans-serif",
+                      fontWeight: 500,
+                      color: "#0E1F33",
+                      background: "#FAFAF9",
+                      appearance: "none",
+                      cursor: "pointer",
+                      outline: "none",
+                    }}
+                  >
+                    {HOUR_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                  {/* Chevron icon */}
+                  <svg
+                    width="14" height="14" viewBox="0 0 24 24" fill="none"
+                    stroke="#8FA3B1" strokeWidth="2.5"
+                    style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </div>
+
+                {/* IST badge */}
+                <span className="text-xs font-semibold px-2 py-1 rounded-md" style={{ background: "rgba(30,120,255,0.07)", color: "#1E78FF", flexShrink: 0 }}>
+                  IST
+                </span>
+
+                {/* UTC preview */}
+                <span className="text-xs" style={{ color: "#8FA3B1", flexShrink: 0 }}>
+                  = {utcLabel}
+                </span>
+
+                {/* Save button */}
+                <button
+                  id="save-notify-hour-btn"
+                  type="submit"
+                  disabled={saving || !isModified}
+                  style={{
+                    marginLeft: "auto",
+                    padding: "9px 20px",
+                    borderRadius: 10,
+                    border: "none",
+                    background: saving || !isModified ? "#D9D3CC" : "#0E1F33",
+                    color: saving || !isModified ? "#8FA3B1" : "#FFFFFF",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    fontFamily: "'Work Sans', sans-serif",
+                    cursor: saving || !isModified ? "not-allowed" : "pointer",
+                    transition: "background 0.15s",
+                    flexShrink: 0,
+                  }}
+                >
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              </div>
+
+              {/* Helper / inline success */}
+              {savedMsg ? (
+                <p className="text-xs mt-2 flex items-center gap-1" style={{ color: "#2D8A63" }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                  Alert time saved — you'll receive reports at <strong style={{ marginLeft: 2 }}>{HOUR_OPTIONS[savedIstHour]?.label} IST</strong>.
+                </p>
+              ) : (
+                <p className="text-xs mt-2" style={{ color: "#8FA3B1" }}>
+                  You'll receive your daily price report at <strong style={{ color: "#5C7589" }}>{previewLabel} IST</strong> ({utcLabel}).
+                </p>
+              )}
+            </form>
+          </>
+        )}
       </div>
     </SectionCard>
   );
 }
+
 
 // ── 03 Password ────────────────────────────────────────────────────────────
 function PasswordSection({ onSave }) {

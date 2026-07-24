@@ -13,5 +13,5 @@ export const QUEUE_NAME = Object.freeze({
 
 // Agent must finish within 1 hour per SRS FR-11
 export const AGENT_TIMEOUT_MS = 55 * 60 * 1000; // 55 min (5 min buffer)
-export const MONITOR_CRON = "0 6 * * *";         // daily at 06:00 UTC
+export const MONITOR_CRON = "0 * * * *";         // every hour — each user's notifyHour gates when alerts fire
 export const CLEANUP_CRON = "0 3 * * *";         // daily at 03:00 UTC

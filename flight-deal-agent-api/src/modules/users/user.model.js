@@ -54,6 +54,16 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
+    // ── Notification schedule ──────────────────────
+    // UTC hour (0-23) at which to send the daily Telegram alert.
+    // Default: 6 = 06:00 UTC = 11:30 AM IST, matching the original cron.
+    notifyHour: {
+      type: Number,
+      default: 6,
+      min: 0,
+      max: 23,
+    },
+
     // ── Refresh token (hashed) ─────────────────────
     refreshTokenHash: {
       type: String,
@@ -114,6 +124,7 @@ userSchema.methods.toPublicProfile = function () {
     authProvider: this.authProvider,
     telegramChatId: this.telegramChatId,
     whatsappNumber: this.whatsappNumber,
+    notifyHour: this.notifyHour ?? 6,
     isActive: this.isActive,
     createdAt: this.createdAt,
   };

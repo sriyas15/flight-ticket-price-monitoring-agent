@@ -109,7 +109,17 @@ const _processFixedRoute = async (route, agentRunId) => {
     return { dealt: isDeal, price: result.price };
   }
 
-  // 8. Send daily price report (always — target hit is just a label in the message)
+  // 8. Hour gate — only send when current UTC hour matches user's preference
+  const currentHour   = new Date().getUTCHours();
+  const preferredHour = user.notifyHour ?? 6;
+  if (currentHour !== preferredHour) {
+    logger.debug(
+      `Hour gate: skipping alert for user ${user._id} — UTC ${currentHour} ≠ preferred ${preferredHour}`
+    );
+    return { dealt: isDeal, price: result.price };
+  }
+
+  // 9. Send daily price report (always — target hit is just a label in the message)
   const sent = await NotificationService.sendDealAlert({
     user,
     route,
@@ -192,7 +202,17 @@ const _processExploreRoute = async (route, agentRunId) => {
     return { dealt: false, price: cheapest.price };
   }
 
-  // 6. Send consolidated explore digest
+  // 6. Hour gate — only send when current UTC hour matches user's preference
+  const currentHour   = new Date().getUTCHours();
+  const preferredHour = user.notifyHour ?? 6;
+  if (currentHour !== preferredHour) {
+    logger.debug(
+      `Hour gate: skipping explore alert for user ${user._id} — UTC ${currentHour} ≠ preferred ${preferredHour}`
+    );
+    return { dealt: false, price: cheapest.price };
+  }
+
+  // 7. Send consolidated explore digest
   const sent = await NotificationService.sendExploreAlert({
     user,
     route,

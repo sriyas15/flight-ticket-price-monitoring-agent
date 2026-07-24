@@ -79,6 +79,23 @@ router.delete("/me/telegram", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── PATCH /users/me/notify-hour — set preferred alert hour (UTC 0-23) ────
+router.patch("/me/notify-hour",
+  [
+    body("notifyHour")
+      .isInt({ min: 0, max: 23 })
+      .withMessage("notifyHour must be an integer between 0 and 23"),
+  ],
+  validate,
+  async (req, res, next) => {
+    try {
+      const { notifyHour } = req.body;
+      const user = await UserRepository.updateById(req.user.sub, { notifyHour });
+      return sendSuccess(res, 200, "Notification time updated", { user: user.toPublicProfile() });
+    } catch (err) { next(err); }
+  }
+);
+
 // ── POST /users/me/test-alert — send a mock Telegram alert ───────────────
 router.post("/me/test-alert", async (req, res, next) => {
   try {
