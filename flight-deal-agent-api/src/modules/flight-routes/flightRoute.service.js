@@ -11,7 +11,7 @@ const FlightRouteService = {
     const count = await FlightRouteRepository.countNonDeletedForUser(userId);
     if (count >= FlightRoute.MAX_PER_USER) {
       throw ApiError.badRequest(
-        `You can monitor a maximum of ${FlightRoute.MAX_PER_USER} routes. Delete or pause an existing route first.`
+        `You can monitor a maximum of ${FlightRoute.MAX_PER_USER} routes. Delete an existing route first.`
       );
     }
 
